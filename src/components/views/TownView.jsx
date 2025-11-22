@@ -32,6 +32,8 @@ export const TownView = ({
   learnSkill,
   useItemOnEquipment,
   startDungeon,
+  optionDisplayMode,
+  setOptionDisplayMode,
 }) => {
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -39,6 +41,8 @@ export const TownView = ({
         player={player} 
         getStats={getStats} 
         equipment={equipment}
+        optionDisplayMode={optionDisplayMode}
+        setOptionDisplayMode={setOptionDisplayMode}
       />
 
       <div className="flex-1 overflow-y-auto">
@@ -68,6 +72,7 @@ export const TownView = ({
             handleDragOver={handleDragOver}
             handleDrop={handleDrop}
             setDragOverTarget={setDragOverTarget}
+            optionDisplayMode={optionDisplayMode}
           />
         )}
 
@@ -104,6 +109,7 @@ export const TownView = ({
             handleDrop={handleDrop}
             setDragOverTarget={setDragOverTarget}
             useItemOnEquipment={useItemOnEquipment}
+            optionDisplayMode={optionDisplayMode}
           />
         )}
       </div>

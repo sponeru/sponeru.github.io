@@ -207,7 +207,7 @@ export const ItemModal = ({
           )}
           {selectedItem.options && selectedItem.options.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-800">
-              {renderMergedOptions(selectedItem.options)}
+              {renderMergedOptions(selectedItem.options, selectedItem.type)}
             </div>
           )}
         </div>

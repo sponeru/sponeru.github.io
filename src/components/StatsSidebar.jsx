@@ -3,13 +3,59 @@ import { Trophy } from 'lucide-react';
 import { ItemSlot } from './ItemSlot';
 import { EQUIPMENT_SLOTS, getSlotLabel } from '../utils/gameUtils';
 
-export const StatsSidebar = ({ player, getStats, equipment }) => {
+export const StatsSidebar = ({ player, getStats, equipment, optionDisplayMode, setOptionDisplayMode }) => {
+  const getModeLabel = () => {
+    if (optionDisplayMode === 'merged') return '統合';
+    if (optionDisplayMode === 'composite') return '複合表示';
+    return '個別';
+  };
+
   return (
     <aside className="w-80 bg-gray-900 border-r border-gray-800 overflow-y-auto flex-shrink-0">
       <div className="p-6">
         <h3 className="text-lg font-bold text-yellow-500 mb-4 flex items-center gap-2">
           <Trophy size={20}/> ステータス
         </h3>
+        
+        {/* オプション表示モード切り替え */}
+        <div className="mb-6 pb-6 border-b border-gray-700">
+          <div className="text-xs text-gray-400 mb-2 font-bold">オプション表示モード</div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setOptionDisplayMode('merged')}
+              className={`flex-1 px-2 py-2 text-xs rounded transition-colors ${
+                optionDisplayMode === 'merged' 
+                  ? 'bg-blue-600 text-white font-bold' 
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              統合
+            </button>
+            <button
+              onClick={() => setOptionDisplayMode('composite')}
+              className={`flex-1 px-2 py-2 text-xs rounded transition-colors ${
+                optionDisplayMode === 'composite' 
+                  ? 'bg-blue-600 text-white font-bold' 
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              複合
+            </button>
+            <button
+              onClick={() => setOptionDisplayMode('split')}
+              className={`flex-1 px-2 py-2 text-xs rounded transition-colors ${
+                optionDisplayMode === 'split' 
+                  ? 'bg-blue-600 text-white font-bold' 
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              個別
+            </button>
+          </div>
+          <div className="text-xs text-gray-500 mt-2 text-center">
+            現在: {getModeLabel()}
+          </div>
+        </div>
         {['str','vit','dex'].map(k => (
           <div key={k} className="flex justify-between items-center bg-gray-800 p-4 rounded-lg mb-2 hover:bg-gray-750 transition-colors">
             <span className="text-gray-300 uppercase font-bold text-sm">{k === 'str' ? '筋力' : k === 'vit' ? '体力' : '幸運'}</span>
@@ -124,7 +170,9 @@ export const StatsSidebar = ({ player, getStats, equipment }) => {
                     item={equipment[slot]} 
                     onClick={() => {}} 
                     isEquipped={true} 
-                    iconSize={32} 
+                    iconSize={32}
+                    optionDisplayMode={optionDisplayMode}
+                    equipmentType={slot}
                   />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -146,7 +194,9 @@ export const StatsSidebar = ({ player, getStats, equipment }) => {
                       item={equipment[`skill${num}`]} 
                       onClick={() => {}} 
                       isEquipped={true} 
-                      iconSize={28} 
+                      iconSize={28}
+                      optionDisplayMode={optionDisplayMode}
+                      equipmentType="skill"
                     />
                   </div>
                   <div className="flex-1 min-w-0">

@@ -5,7 +5,6 @@ import { getElementConfig } from '../constants.jsx';
 export const ItemIcon = ({ item, size = 24 }) => {
   if (item.type === 'weapon') return <Sword size={size} />;
   if (item.type === 'armor') return <Shield size={size} />;
-  if (item.type === 'accessory') return <Circle size={size} className="text-blue-400" />;
   if (item.type === 'amulet') return <Gem size={size} className="text-purple-400" />;
   if (item.type === 'ring') return <Circle size={size} className="text-yellow-400" />;
   if (item.type === 'belt') return <Layers size={size} className="text-orange-400" />;

@@ -16,6 +16,8 @@ import {
   getElementConfig,
   BASIC_OPTIONS,
   SPECIAL_OPTIONS,
+  EQUIPMENT_TYPE_OPTIONS,
+  COMPOSITE_OPTIONS,
 } from './constants.jsx';
 
 import {
@@ -65,6 +67,7 @@ export default function HackSlashGame() {
   const [isInitialLoad, setIsInitialLoad] = useState(true); // 初期ロード完了フラグ
   const [draggedItem, setDraggedItem] = useState(null); // ドラッグ中のアイテム
   const [dragOverTarget, setDragOverTarget] = useState(null); // ドラッグオーバー中のターゲット
+  const [optionDisplayMode, setOptionDisplayMode] = useState('merged'); // 'merged' (統合), 'composite' (複合表示), 'split' (個別)
   
   // 初期ロード: 初回のみ実行
   useEffect(() => {
@@ -120,26 +123,116 @@ export default function HackSlashGame() {
   const getStats = useMemo(() => {
     let stats = {
       str: player.stats.str, vit: player.stats.vit, dex: player.stats.dex,
-      atk: 0, def: 0, hp: 0,
+      atk: 0, def: 0, hp: 0, maxMp: 0,
       vamp: 0, goldMult: 0, expMult: 0, critDmg: 0, crit: 0,
       res_fire: 0, res_ice: 0, res_thunder: 0, res_light: 0, res_dark: 0,
-      cdSpeed: 0
+      cdSpeed: 0, dmgMult: 0, hpRegen: 0,
+      skillLevel_fire: 0, skillLevel_ice: 0, skillLevel_thunder: 0, skillLevel_light: 0, skillLevel_dark: 0,
     };
+    
+    let globalHpMult = 0;
+    let globalMaxMpMult = 0;
 
     Object.values(equipment).forEach(item => {
       if (!item) return;
       const base = item.baseStats || item.stats || {};
-      if (base.atk) stats.atk += base.atk;
-      if (base.def) stats.def += base.def;
-      if (base.hp) stats.hp += base.hp;
+      
+      // 装備自体のATK/防御力/HP上昇(割合)を適用
+      let atkMult = 1;
+      let defMult = 1;
+      let hpMult = 1;
+      
+      if (item.options) {
+        item.options.forEach(opt => {
+          // 複合オプションの場合
+          if (opt.isComposite && opt.compositeVals) {
+            opt.compositeVals.forEach(compVal => {
+              if (compVal.type === 'atk_mult') atkMult += compVal.val / 100;
+              if (compVal.type === 'def_mult') defMult += compVal.val / 100;
+              if (compVal.type === 'hp_mult') hpMult += compVal.val / 100;
+            });
+          } else {
+            if (opt.type === 'atk_mult') atkMult += opt.val / 100;
+            if (opt.type === 'def_mult') defMult += opt.val / 100;
+            if (opt.type === 'hp_mult') hpMult += opt.val / 100;
+          }
+        });
+      }
+      
+      if (base.atk) stats.atk += Math.floor(base.atk * atkMult);
+      if (base.def) stats.def += Math.floor(base.def * defMult);
+      if (base.hp) stats.hp += Math.floor(base.hp * hpMult);
       if (base.str) stats.str += base.str;
       if (base.vit) stats.vit += base.vit;
       if (base.dex) stats.dex += base.dex;
 
       if (item.options) {
         item.options.forEach(opt => {
-          if (stats[opt.type] !== undefined) stats[opt.type] += opt.val;
-          else if (opt.type === 'maxHp') stats.hp += opt.val;
+          // 複合オプションの場合
+          if (opt.isComposite && opt.compositeVals) {
+            opt.compositeVals.forEach(compVal => {
+              if (stats[compVal.type] !== undefined) {
+                stats[compVal.type] += compVal.val;
+              } else if (compVal.type === 'maxHp') {
+                stats.hp += compVal.val;
+              } else if (compVal.type === 'maxMp') {
+                stats.maxMp += compVal.val;
+              } else if (compVal.type === 'dmg_mult') {
+                stats.dmgMult += compVal.val;
+              } else if (compVal.type === 'crit_mult') {
+                stats.crit += compVal.val;
+              } else if (compVal.type === 'critDmg_mult') {
+                stats.critDmg += compVal.val;
+              } else if (compVal.type === 'global_hp_mult') {
+                globalHpMult += compVal.val / 100;
+              } else if (compVal.type === 'global_maxMp_mult') {
+                globalMaxMpMult += compVal.val / 100;
+              } else if (compVal.type === 'hp_regen') {
+                stats.hpRegen += compVal.val;
+              } else if (compVal.type === 'skill_level_fire') {
+                stats.skillLevel_fire += compVal.val;
+              } else if (compVal.type === 'skill_level_ice') {
+                stats.skillLevel_ice += compVal.val;
+              } else if (compVal.type === 'skill_level_thunder') {
+                stats.skillLevel_thunder += compVal.val;
+              } else if (compVal.type === 'skill_level_light') {
+                stats.skillLevel_light += compVal.val;
+              } else if (compVal.type === 'skill_level_dark') {
+                stats.skillLevel_dark += compVal.val;
+              }
+            });
+          } else {
+            // 通常のオプション
+            if (stats[opt.type] !== undefined) {
+              stats[opt.type] += opt.val;
+            } else if (opt.type === 'maxHp') {
+              stats.hp += opt.val;
+            } else if (opt.type === 'maxMp') {
+              stats.maxMp += opt.val;
+            } else if (opt.type === 'dmg_mult') {
+              stats.dmgMult += opt.val;
+            } else if (opt.type === 'crit_mult') {
+              stats.crit += opt.val;
+            } else if (opt.type === 'critDmg_mult') {
+              stats.critDmg += opt.val;
+            } else if (opt.type === 'global_hp_mult') {
+              globalHpMult += opt.val / 100;
+            } else if (opt.type === 'global_maxMp_mult') {
+              globalMaxMpMult += opt.val / 100;
+            } else if (opt.type === 'hp_regen') {
+              stats.hpRegen += opt.val;
+            } else if (opt.type === 'skill_level_fire') {
+              stats.skillLevel_fire += opt.val;
+            } else if (opt.type === 'skill_level_ice') {
+              stats.skillLevel_ice += opt.val;
+            } else if (opt.type === 'skill_level_thunder') {
+              stats.skillLevel_thunder += opt.val;
+            } else if (opt.type === 'skill_level_light') {
+              stats.skillLevel_light += opt.val;
+            } else if (opt.type === 'skill_level_dark') {
+              stats.skillLevel_dark += opt.val;
+            }
+          }
         });
       }
     });
@@ -224,10 +317,27 @@ export default function HackSlashGame() {
 
     const finalAtk = stats.atk + (stats.str * 2);
     const finalDef = stats.def + Math.floor(stats.vit / 2);
-    const finalMaxHp = 100 + (stats.vit * 10) + stats.hp;
-    const finalCrit = Math.min(75, stats.dex * 0.5);
+    let finalMaxHp = 100 + (stats.vit * 10) + stats.hp;
+    // グローバルHP上昇(割合)を適用
+    if (globalHpMult > 0) {
+      finalMaxHp = Math.floor(finalMaxHp * (1 + globalHpMult));
+    }
+    const finalCrit = Math.min(75, stats.dex * 0.5 + stats.crit);
+    
+    // 最大MPの計算（グローバル上昇を含む）
+    let finalMaxMp = 50 + ((player.level - 1) * 5) + stats.maxMp;
+    if (globalMaxMpMult > 0) {
+      finalMaxMp = Math.floor(finalMaxMp * (1 + globalMaxMpMult));
+    }
 
-    return { atk: finalAtk, def: finalDef, maxHp: finalMaxHp, crit: finalCrit, ...stats };
+    return { 
+      atk: finalAtk, 
+      def: finalDef, 
+      maxHp: finalMaxHp, 
+      maxMp: finalMaxMp,
+      crit: finalCrit, 
+      ...stats 
+    };
   }, [player.stats, equipment, player.buffs, player.learnedSkills]);
 
   // --- Dungeon Logic ---
@@ -254,7 +364,7 @@ export default function HackSlashGame() {
     setTab('battle');
     setSkillCds([0,0,0]);
     setPlayer(p => {
-      const maxMp = p.maxMp || 50 + (p.level - 1) * 5;
+      const maxMp = getStats.maxMp || 50 + (p.level - 1) * 5;
       return {...p, buffs: [], mp: maxMp, maxMp: maxMp};
     }); 
     addLog(`${stoneName} (F${floor}〜F${floor+maxFloor})に入場`, 'yellow');
@@ -266,7 +376,7 @@ export default function HackSlashGame() {
     setActiveDungeon(null);
     setEnemy(null);
     setPlayer(p => {
-      const maxMp = p.maxMp || 50 + (p.level - 1) * 5;
+      const maxMp = getStats.maxMp || 50 + (p.level - 1) * 5;
       return {...p, hp: getStats.maxHp, mp: maxMp, buffs: []};
     }); 
     addLog("街に帰還しました", 'blue');
@@ -278,9 +388,14 @@ export default function HackSlashGame() {
 
     const timer = setInterval(() => {
       setPlayer(p => {
-          if (p.buffs.length === 0) return p;
+          if (p.buffs.length === 0 && getStats.hpRegen <= 0) return p;
           const nextBuffs = p.buffs.map(b => ({...b, duration: b.duration - 0.05})).filter(b => b.duration > 0);
-          return { ...p, buffs: nextBuffs };
+          // HP自動回復を適用
+          let newHp = p.hp;
+          if (getStats.hpRegen > 0 && p.hp < getStats.maxHp) {
+            newHp = Math.min(getStats.maxHp, p.hp + getStats.hpRegen * 0.05);
+          }
+          return { ...p, buffs: nextBuffs, hp: newHp };
       });
 
       setSkillCds(prev => prev.map(cd => Math.max(0, cd - 0.05 * (1 + getStats.cdSpeed))));
@@ -345,6 +460,16 @@ export default function HackSlashGame() {
               if (ink.mod.penalty.type === 'cd_up') cdMult += ink.mod.penalty.val;
           }
       });
+      
+      // スキルレベル上昇の効果を適用（属性に応じて）
+      if (base.element && base.element !== 'none') {
+          const skillLevelKey = `skillLevel_${base.element}`;
+          const skillLevelBonus = getStats[skillLevelKey] || 0;
+          if (skillLevelBonus > 0) {
+              // スキルレベル1つにつき5%の威力上昇
+              powerMult += skillLevelBonus * 0.05;
+          }
+      }
 
       const finalPower = base.power * powerMult;
       const finalDuration = (base.duration || 0) * durMult;
@@ -353,6 +478,10 @@ export default function HackSlashGame() {
       for(let i=0; i<multiCast; i++) {
           if (base.type === 'attack') {
               let dmg = Math.floor(getStats.atk * finalPower);
+              // ダメージ増加(割合)を適用
+              if (getStats.dmgMult > 0) {
+                  dmg = Math.floor(dmg * (1 + getStats.dmgMult / 100));
+              }
               setEnemy(prev => {
                   const newHp = Math.max(0, prev.hp - dmg);
                   spawnFloatingText(dmg, getElementConfig(base.element).color.replace('text-',''), false);
@@ -409,6 +538,10 @@ export default function HackSlashGame() {
 
     const isCrit = Math.random() * 100 < getStats.crit;
     let dmg = Math.floor(getStats.atk * (Math.random() * 0.4 + 0.8));
+    // ダメージ増加(割合)を適用
+    if (getStats.dmgMult > 0) {
+      dmg = Math.floor(dmg * (1 + getStats.dmgMult / 100));
+    }
     if (isCrit) dmg = Math.floor(dmg * (1.5 + (getStats.critDmg / 100)));
 
     spawnFloatingText(dmg, isCrit ? 'yellow' : 'white', isCrit);
@@ -446,8 +579,8 @@ export default function HackSlashGame() {
       newPlayer.expToNext = Math.floor(newPlayer.expToNext * 1.2);
       newPlayer.skillPoints = (newPlayer.skillPoints || 0) + 1;
       newPlayer.hp = getStats.maxHp;
-      // MPも回復
-      newPlayer.maxMp = 50 + (newPlayer.level - 1) * 5;
+      // MPも回復（getStats.maxMpを使用）
+      newPlayer.maxMp = getStats.maxMp || (50 + (newPlayer.level - 1) * 5);
       newPlayer.mp = newPlayer.maxMp;
       addLog(`Level Up! ${newPlayer.level} (+1スキルポイント)`, 'yellow');
     }
@@ -1080,17 +1213,95 @@ export default function HackSlashGame() {
       }
       const power = updatedEquipment.power || 1;
       const powerMult = item.powerMult || 1.0;
-      const pool = [...BASIC_OPTIONS];
-      const optType = pool[Math.floor(Math.random() * pool.length)];
-      let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100 * powerMult));
       
-      if (optType.type === 'maxHp') val *= 5;
-      if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
-      if (optType.isRes) val = Math.floor(5 + Math.random() * 15 * powerMult);
+      // 装備タイプに応じたオプションプールを取得
+      let pool = [];
+      if (updatedEquipment.type && EQUIPMENT_TYPE_OPTIONS[updatedEquipment.type]) {
+        pool = [...EQUIPMENT_TYPE_OPTIONS[updatedEquipment.type]];
+      } else {
+        pool = [...BASIC_OPTIONS];
+      }
       
-      updatedEquipment.options = [...(updatedEquipment.options || []), { ...optType, val, isSpecial: false }];
-      success = true;
-      message = `オプション「${optType.label} +${val}${optType.unit || ''}」が追加されました`;
+      // 複合オプションをプールに追加
+      const availableCompositeOptions = COMPOSITE_OPTIONS.filter(composite => {
+        return composite.compositeTypes.every(compType => {
+          return pool.some(opt => opt.type === compType) || 
+                 BASIC_OPTIONS.some(opt => opt.type === compType);
+        });
+      });
+      pool = [...pool, ...availableCompositeOptions];
+      
+      // 既存のオプションタイプをプールから除外（複合オプションの場合は含まれるタイプもチェック）
+      const existingTypes = (updatedEquipment.options || []).flatMap(opt => {
+        if (opt.isComposite && opt.compositeTypes) {
+          return [opt.type, ...opt.compositeTypes];
+        }
+        return [opt.type];
+      });
+      
+      const availablePool = pool.filter(opt => {
+        if (opt.isComposite && opt.compositeTypes) {
+          return !opt.compositeTypes.some(compType => existingTypes.includes(compType));
+        }
+        return !existingTypes.includes(opt.type);
+      });
+      
+      if (availablePool.length === 0) {
+        addLog('追加できる新しいオプションがありません（既にすべてのオプションが付いています）', 'red');
+        return;
+      }
+      
+      const optType = availablePool[Math.floor(Math.random() * availablePool.length)];
+      
+      // 複合オプションの場合
+      if (optType.isComposite && optType.compositeTypes) {
+        const compositeVals = optType.compositeTypes.map(compType => {
+          let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100 * powerMult));
+          const baseOpt = pool.find(o => o.type === compType) || BASIC_OPTIONS.find(o => o.type === compType);
+          if (!baseOpt) return { type: compType, val: 0 };
+          
+          if (compType === 'maxHp') val *= 5;
+          if (compType === 'maxMp') val = Math.max(1, Math.floor(power * (Math.random() * 3 + 5) / 100 * powerMult));
+          if (['str','vit','dex'].includes(compType)) val = Math.max(1, Math.floor(val / 2));
+          if (baseOpt.isRes) val = Math.floor(5 + Math.random() * 15 * powerMult);
+          if (baseOpt.isPercent) val = Math.floor(1 + Math.random() * 9 * powerMult);
+          if (baseOpt.isSkillLevel) val = Math.floor(1 + Math.random() * 4 * powerMult);
+          if (compType === 'hp_regen') val = Math.floor(1 + Math.random() * 4 * powerMult);
+          
+          return { type: compType, val };
+        });
+        
+        updatedEquipment.options = [...(updatedEquipment.options || []), { 
+          ...optType, 
+          compositeVals,
+          val: 0,
+          isSpecial: false,
+          isComposite: true 
+        }];
+        success = true;
+        message = `複合オプション「${optType.label}」が追加されました`;
+      } else {
+        // 通常のオプション
+        let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100 * powerMult));
+        
+        if (optType.type === 'maxHp') val *= 5;
+        if (optType.type === 'maxMp') val = Math.max(1, Math.floor(power * (Math.random() * 3 + 5) / 100 * powerMult));
+        if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
+        if (optType.isRes) val = Math.floor(5 + Math.random() * 15 * powerMult);
+        if (optType.isPercent) {
+          val = Math.floor(1 + Math.random() * 9 * powerMult);
+        }
+        if (optType.isSkillLevel) {
+          val = Math.floor(1 + Math.random() * 4 * powerMult);
+        }
+        if (optType.type === 'hp_regen') {
+          val = Math.floor(1 + Math.random() * 4 * powerMult);
+        }
+        
+        updatedEquipment.options = [...(updatedEquipment.options || []), { ...optType, val, isSpecial: false }];
+        success = true;
+        message = `オプション「${optType.label} +${val}${optType.unit || ''}」が追加されました`;
+      }
     }
     else if (item.type === 'element_stone') {
       // 属性付与石: 属性耐性を付与
@@ -1100,6 +1311,12 @@ export default function HackSlashGame() {
         return;
       }
       const resType = `res_${item.element}`;
+      // 既存のオプションタイプをチェック
+      const existingTypes = (updatedEquipment.options || []).map(opt => opt.type);
+      if (existingTypes.includes(resType)) {
+        addLog('既にこの属性耐性が付いています', 'red');
+        return;
+      }
       const resOption = BASIC_OPTIONS.find(o => o.type === resType);
       if (resOption) {
         updatedEquipment.options = [...(updatedEquipment.options || []), { ...resOption, val: item.value || 10, isSpecial: false }];
@@ -1112,6 +1329,12 @@ export default function HackSlashGame() {
       const maxOptions = RARITIES[updatedEquipment.rarity].optCount;
       if ((updatedEquipment.options?.length || 0) >= maxOptions) {
         addLog('オプション枠が満杯です', 'red');
+        return;
+      }
+      // 既存のオプションタイプをチェック
+      const existingTypes = (updatedEquipment.options || []).map(opt => opt.type);
+      if (existingTypes.includes(item.specialType)) {
+        addLog('既にこの特殊オプションが付いています', 'red');
         return;
       }
       const specialOption = SPECIAL_OPTIONS.find(o => o.type === item.specialType);
@@ -1130,20 +1353,104 @@ export default function HackSlashGame() {
       const optionIndex = Math.floor(Math.random() * updatedEquipment.options.length);
       const power = updatedEquipment.power || 1;
       const powerMult = item.powerMult || 1.0;
-      const pool = [...BASIC_OPTIONS, ...SPECIAL_OPTIONS];
-      const optType = pool[Math.floor(Math.random() * pool.length)];
-      let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100 * powerMult));
       
-      if (optType.type === 'maxHp') val *= 5;
-      if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
-      if (optType.isRes) val = Math.floor(5 + Math.random() * 15 * powerMult);
-      if (optType.min && optType.max) val = Math.floor(optType.min + Math.random() * (optType.max - optType.min) * powerMult);
+      // 装備タイプに応じたオプションプールを取得
+      let pool = [];
+      if (updatedEquipment.type && EQUIPMENT_TYPE_OPTIONS[updatedEquipment.type]) {
+        pool = [...EQUIPMENT_TYPE_OPTIONS[updatedEquipment.type]];
+      } else {
+        pool = [...BASIC_OPTIONS];
+      }
       
-      const newOptions = [...updatedEquipment.options];
-      newOptions[optionIndex] = { ...optType, val, isSpecial: optType.min !== undefined };
-      updatedEquipment.options = newOptions;
-      success = true;
-      message = `オプションが「${optType.label} +${val}${optType.unit || ''}」に変更されました`;
+      // 複合オプションをプールに追加
+      const availableCompositeOptions = COMPOSITE_OPTIONS.filter(composite => {
+        return composite.compositeTypes.every(compType => {
+          return pool.some(opt => opt.type === compType) || 
+                 BASIC_OPTIONS.some(opt => opt.type === compType);
+        });
+      });
+      pool = [...pool, ...availableCompositeOptions];
+      
+      // 特殊オプションも追加（装備タイプに関係なく）
+      pool = [...pool, ...SPECIAL_OPTIONS];
+      
+      // 既存のオプションタイプをプールから除外（変更対象のオプション自体は除外、複合オプションの場合は含まれるタイプもチェック）
+      const existingTypes = updatedEquipment.options.flatMap((opt, idx) => {
+        if (idx === optionIndex) return [];
+        if (opt.isComposite && opt.compositeTypes) {
+          return [opt.type, ...opt.compositeTypes];
+        }
+        return [opt.type];
+      });
+      
+      const availablePool = pool.filter(opt => {
+        if (opt.isComposite && opt.compositeTypes) {
+          return !opt.compositeTypes.some(compType => existingTypes.includes(compType));
+        }
+        return !existingTypes.includes(opt.type);
+      });
+      
+      if (availablePool.length === 0) {
+        addLog('変更できる新しいオプションがありません（既にすべてのオプションが付いています）', 'red');
+        return;
+      }
+      
+      const optType = availablePool[Math.floor(Math.random() * availablePool.length)];
+      
+      // 複合オプションの場合
+      if (optType.isComposite && optType.compositeTypes) {
+        const compositeVals = optType.compositeTypes.map(compType => {
+          let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100 * powerMult));
+          const baseOpt = pool.find(o => o.type === compType) || BASIC_OPTIONS.find(o => o.type === compType);
+          if (!baseOpt) return { type: compType, val: 0 };
+          
+          if (compType === 'maxHp') val *= 5;
+          if (compType === 'maxMp') val = Math.max(1, Math.floor(power * (Math.random() * 3 + 5) / 100 * powerMult));
+          if (['str','vit','dex'].includes(compType)) val = Math.max(1, Math.floor(val / 2));
+          if (baseOpt.isRes) val = Math.floor(5 + Math.random() * 15 * powerMult);
+          if (baseOpt.isPercent) val = Math.floor(1 + Math.random() * 9 * powerMult);
+          if (baseOpt.isSkillLevel) val = Math.floor(1 + Math.random() * 4 * powerMult);
+          if (compType === 'hp_regen') val = Math.floor(1 + Math.random() * 4 * powerMult);
+          
+          return { type: compType, val };
+        });
+        
+        const newOptions = [...updatedEquipment.options];
+        newOptions[optionIndex] = { 
+          ...optType, 
+          compositeVals,
+          val: 0,
+          isSpecial: false,
+          isComposite: true 
+        };
+        updatedEquipment.options = newOptions;
+        success = true;
+        message = `オプションが「${optType.label}」に変更されました`;
+      } else {
+        // 通常のオプション
+        let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100 * powerMult));
+        
+        if (optType.type === 'maxHp') val *= 5;
+        if (optType.type === 'maxMp') val = Math.max(1, Math.floor(power * (Math.random() * 3 + 5) / 100 * powerMult));
+        if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
+        if (optType.isRes) val = Math.floor(5 + Math.random() * 15 * powerMult);
+        if (optType.isPercent) {
+          val = Math.floor(1 + Math.random() * 9 * powerMult);
+        }
+        if (optType.isSkillLevel) {
+          val = Math.floor(1 + Math.random() * 4 * powerMult);
+        }
+        if (optType.type === 'hp_regen') {
+          val = Math.floor(1 + Math.random() * 4 * powerMult);
+        }
+        if (optType.min && optType.max) val = Math.floor(optType.min + Math.random() * (optType.max - optType.min) * powerMult);
+        
+        const newOptions = [...updatedEquipment.options];
+        newOptions[optionIndex] = { ...optType, val, isSpecial: optType.min !== undefined || optType.isSpecial };
+        updatedEquipment.options = newOptions;
+        success = true;
+        message = `オプションが「${optType.label} +${val}${optType.unit || ''}」に変更されました`;
+      }
     }
     else if (item.type === 'option_slot_stone') {
       // オプション枠拡張石: オプション枠を増やす
@@ -1191,18 +1498,104 @@ export default function HackSlashGame() {
         const additionalSlots = newMaxOptions - oldMaxOptions;
         const power = updatedEquipment.power || 1;
         
-        // 追加分のオプションを生成
-        const pool = [...BASIC_OPTIONS];
+        // 装備タイプに応じたオプションプールを取得
+        let pool = [];
+        if (updatedEquipment.type && EQUIPMENT_TYPE_OPTIONS[updatedEquipment.type]) {
+          pool = [...EQUIPMENT_TYPE_OPTIONS[updatedEquipment.type]];
+        } else {
+          pool = [...BASIC_OPTIONS];
+        }
+        
+        // 複合オプションをプールに追加
+        const availableCompositeOptions = COMPOSITE_OPTIONS.filter(composite => {
+          return composite.compositeTypes.every(compType => {
+            return pool.some(opt => opt.type === compType) || 
+                   BASIC_OPTIONS.some(opt => opt.type === compType);
+          });
+        });
+        pool = [...pool, ...availableCompositeOptions];
+        
+        // 既存のオプションタイプをプールから除外（複合オプションの場合は含まれるタイプもチェック）
+        const existingTypes = currentOptions.flatMap(opt => {
+          if (opt.isComposite && opt.compositeTypes) {
+            return [opt.type, ...opt.compositeTypes];
+          }
+          return [opt.type];
+        });
+        let availablePool = pool.filter(opt => {
+          if (opt.isComposite && opt.compositeTypes) {
+            return !opt.compositeTypes.some(compType => existingTypes.includes(compType));
+          }
+          return !existingTypes.includes(opt.type);
+        });
+        
+        if (availablePool.length === 0) {
+          addLog('追加できる新しいオプションがありません（既にすべてのオプションが付いています）', 'red');
+          return;
+        }
+        
         const newOptions = [];
         for (let i = 0; i < additionalSlots; i++) {
-          const optType = pool[Math.floor(Math.random() * pool.length)];
-          let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100));
+          if (availablePool.length === 0) break;
           
-          if (optType.type === 'maxHp') val *= 5;
-          if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
-          if (optType.isRes) val = Math.floor(5 + Math.random() * 15);
+          const optType = availablePool[Math.floor(Math.random() * availablePool.length)];
           
-          newOptions.push({ ...optType, val, isSpecial: false });
+          // 複合オプションの場合
+          if (optType.isComposite && optType.compositeTypes) {
+            const compositeVals = optType.compositeTypes.map(compType => {
+              let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100));
+              const baseOpt = pool.find(o => o.type === compType) || BASIC_OPTIONS.find(o => o.type === compType);
+              if (!baseOpt) return { type: compType, val: 0 };
+              
+              if (compType === 'maxHp') val *= 5;
+              if (compType === 'maxMp') val = Math.max(1, Math.floor(power * (Math.random() * 3 + 5) / 100));
+              if (['str','vit','dex'].includes(compType)) val = Math.max(1, Math.floor(val / 2));
+              if (baseOpt.isRes) val = Math.floor(5 + Math.random() * 15);
+              if (baseOpt.isPercent) val = Math.floor(1 + Math.random() * 9);
+              if (baseOpt.isSkillLevel) val = Math.floor(1 + Math.random() * 4);
+              if (compType === 'hp_regen') val = Math.floor(1 + Math.random() * 4);
+              
+              return { type: compType, val };
+            });
+            
+            newOptions.push({ 
+              ...optType, 
+              compositeVals,
+              val: 0,
+              isSpecial: false,
+              isComposite: true 
+            });
+            
+            // 追加したオプションタイプをプールから除外
+            availablePool = availablePool.filter(opt => {
+              if (opt.isComposite && opt.compositeTypes) {
+                return !opt.compositeTypes.some(compType => optType.compositeTypes.includes(compType));
+              }
+              return opt.type !== optType.type;
+            });
+          } else {
+            // 通常のオプション
+            let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100));
+            
+            if (optType.type === 'maxHp') val *= 5;
+            if (optType.type === 'maxMp') val = Math.max(1, Math.floor(power * (Math.random() * 3 + 5) / 100));
+            if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
+            if (optType.isRes) val = Math.floor(5 + Math.random() * 15);
+            if (optType.isPercent) {
+              val = Math.floor(1 + Math.random() * 9);
+            }
+            if (optType.isSkillLevel) {
+              val = Math.floor(1 + Math.random() * 4);
+            }
+            if (optType.type === 'hp_regen') {
+              val = Math.floor(1 + Math.random() * 4);
+            }
+            
+            newOptions.push({ ...optType, val, isSpecial: false });
+            
+            // 追加したオプションタイプをプールから除外
+            availablePool = availablePool.filter(opt => opt.type !== optType.type);
+          }
         }
         
         updatedEquipment.options = [...currentOptions, ...newOptions];
@@ -1270,20 +1663,164 @@ export default function HackSlashGame() {
     setTimeout(() => setFloatingTexts(prev => prev.filter(ft => ft.id !== id)), 800);
   };
 
-  const renderMergedOptions = (options) => {
+  // キーイベントで表示モードを切り替え
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === 'Tab' && e.shiftKey && !e.ctrlKey && !e.altKey) {
+        // モーダルや入力フィールドが開いていない場合のみ
+        if (!selectedItem && !inkModeItem && !equipmentItemMode) {
+          e.preventDefault();
+          // merged -> composite -> split -> merged の順で切り替え
+          setOptionDisplayMode(prev => {
+            if (prev === 'merged') return 'composite';
+            if (prev === 'composite') return 'split';
+            return 'merged';
+          });
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [selectedItem, inkModeItem, equipmentItemMode]);
+
+  const renderMergedOptions = (options, equipmentType = null) => {
     if (!options || options.length === 0) return null;
-    const merged = options.reduce((acc, opt) => {
-        if (!acc[opt.label]) acc[opt.label] = { ...opt, val: 0 };
-        acc[opt.label].val += opt.val;
-        if (opt.isSpecial) acc[opt.label].isSpecial = true;
+    
+    if (optionDisplayMode === 'split') {
+      // スロットごとに分けて表示
+      return (
+        <>
+          {options.map((opt, idx) => {
+            if (opt.isComposite && opt.compositeVals) {
+              // 複合オプションの場合
+              return (
+                <div key={idx} className="py-2 border-b border-gray-800 last:border-0">
+                  <div className="text-sm text-purple-300 font-bold mb-1">[{idx + 1}] {opt.label} (複合)</div>
+                  {opt.compositeVals.map((compVal, compIdx) => {
+                    const compOpt = BASIC_OPTIONS.find(o => o.type === compVal.type) || 
+                                   (equipmentType && EQUIPMENT_TYPE_OPTIONS[equipmentType]?.find(o => o.type === compVal.type));
+                    return (
+                      <div key={compIdx} className="flex justify-between items-center pl-4 text-xs text-gray-300">
+                        <span>{compOpt?.label || compVal.type}</span>
+                        <span>+{compVal.val}{compOpt?.unit || ''}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            } else {
+              // 通常のオプション
+              return (
+                <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0">
+                  <span className={`text-sm ${opt.isSpecial ? 'text-yellow-400 font-bold' : 'text-blue-200'}`}>
+                    [{idx + 1}] {opt.label}
+                  </span>
+                  <span className={`text-base font-bold ${opt.isSpecial ? 'text-yellow-400' : 'text-blue-200'}`}>
+                    +{opt.val}{opt.unit || ''}
+                  </span>
+                </div>
+              );
+            }
+          })}
+        </>
+      );
+    } else if (optionDisplayMode === 'composite') {
+      // 複合オプションは複合として表示、通常オプションは統合表示
+      const merged = options.reduce((acc, opt) => {
+        if (opt.isComposite && opt.compositeVals) {
+          // 複合オプションは複合として表示
+          const compositeKey = opt.label || opt.type;
+          if (!acc[compositeKey]) {
+            acc[compositeKey] = { 
+              label: opt.label, 
+              isComposite: true,
+              compositeVals: [],
+              isSpecial: opt.isSpecial 
+            };
+          }
+          opt.compositeVals.forEach(compVal => {
+            const existing = acc[compositeKey].compositeVals.find(cv => cv.type === compVal.type);
+            if (existing) {
+              existing.val += compVal.val;
+            } else {
+              acc[compositeKey].compositeVals.push({ ...compVal });
+            }
+          });
+        } else {
+          // 通常オプションは統合表示
+          if (!acc[opt.label]) acc[opt.label] = { ...opt, val: 0 };
+          acc[opt.label].val += opt.val;
+          if (opt.isSpecial) acc[opt.label].isSpecial = true;
+        }
         return acc;
-    }, {});
-    return Object.values(merged).map((opt, idx) => (
-        <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0 last:mb-0">
-            <span className={`text-sm ${opt.isSpecial ? 'text-yellow-400 font-bold' : 'text-blue-200'}`}>{opt.label}</span>
-            <span className={`text-base font-bold ${opt.isSpecial ? 'text-yellow-400' : 'text-blue-200'}`}>+{opt.val}{opt.unit || ''}</span>
-        </div>
-    ));
+      }, {});
+      
+      return (
+        <>
+          {Object.values(merged).map((opt, idx) => {
+            if (opt.isComposite && opt.compositeVals) {
+              // 複合オプションの表示
+              return (
+                <div key={idx} className="py-2 border-b border-gray-800 last:border-0">
+                  <div className={`text-sm text-purple-300 font-bold mb-1 ${opt.isSpecial ? 'text-yellow-400' : ''}`}>
+                    {opt.isSpecial && <span className="text-yellow-400">★ </span>}
+                    {opt.label} (複合)
+                  </div>
+                  {opt.compositeVals.map((compVal, compIdx) => {
+                    const compOpt = BASIC_OPTIONS.find(o => o.type === compVal.type) || 
+                                   (equipmentType && EQUIPMENT_TYPE_OPTIONS[equipmentType]?.find(o => o.type === compVal.type));
+                    return (
+                      <div key={compIdx} className="flex justify-between items-center pl-4 text-xs text-gray-300">
+                        <span>{compOpt?.label || compVal.type}</span>
+                        <span>+{compVal.val}{compOpt?.unit || ''}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            } else {
+              // 通常オプションの表示
+              return (
+                <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0 last:mb-0">
+                  <span className={`text-sm ${opt.isSpecial ? 'text-yellow-400 font-bold' : 'text-blue-200'}`}>{opt.label}</span>
+                  <span className={`text-base font-bold ${opt.isSpecial ? 'text-yellow-400' : 'text-blue-200'}`}>+{opt.val}{opt.unit || ''}</span>
+                </div>
+              );
+            }
+          })}
+        </>
+      );
+    } else {
+      // merged: すべて統合表示（複合オプションも個別に展開）
+      const merged = options.reduce((acc, opt) => {
+        if (opt.isComposite && opt.compositeVals) {
+          // 複合オプションは個別に処理
+          opt.compositeVals.forEach(compVal => {
+            const compOpt = BASIC_OPTIONS.find(o => o.type === compVal.type) || 
+                           (equipmentType && EQUIPMENT_TYPE_OPTIONS[equipmentType]?.find(o => o.type === compVal.type));
+            const label = compOpt?.label || compVal.type;
+            if (!acc[label]) acc[label] = { label, val: 0, unit: compOpt?.unit || '', isSpecial: opt.isSpecial };
+            acc[label].val += compVal.val;
+          });
+        } else {
+          if (!acc[opt.label]) acc[opt.label] = { ...opt, val: 0 };
+          acc[opt.label].val += opt.val;
+          if (opt.isSpecial) acc[opt.label].isSpecial = true;
+        }
+        return acc;
+      }, {});
+      
+      return (
+        <>
+          {Object.values(merged).map((opt, idx) => (
+            <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0 last:mb-0">
+              <span className={`text-sm ${opt.isSpecial ? 'text-yellow-400 font-bold' : 'text-blue-200'}`}>{opt.label}</span>
+              <span className={`text-base font-bold ${opt.isSpecial ? 'text-yellow-400' : 'text-blue-200'}`}>+{opt.val}{opt.unit || ''}</span>
+            </div>
+          ))}
+        </>
+      );
+    }
   };
 
   return (
@@ -1331,6 +1868,8 @@ export default function HackSlashGame() {
               learnSkill={learnSkill}
               useItemOnEquipment={useItemOnEquipment}
               startDungeon={startDungeon}
+              optionDisplayMode={optionDisplayMode}
+              setOptionDisplayMode={setOptionDisplayMode}
             />
         )}
 

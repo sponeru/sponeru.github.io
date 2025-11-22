@@ -1,8 +1,8 @@
 import React from 'react';
 import { ItemIcon } from './ItemIcon';
-import { RARITIES, getElementConfig, SPECIAL_OPTIONS } from '../constants.jsx';
+import { RARITIES, getElementConfig, SPECIAL_OPTIONS, BASIC_OPTIONS, EQUIPMENT_TYPE_OPTIONS } from '../constants.jsx';
 
-export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false, placement = 'top', positionType = 'absolute' }) => {
+export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false, placement = 'top', positionType = 'absolute', optionDisplayMode = 'merged', equipmentType = null }) => {
   if (!item || !isVisible) return null;
 
   const rarity = RARITIES[item.rarity] || RARITIES.common;
@@ -40,7 +40,7 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
       return (
         <div className="text-yellow-300">
           <div className="mb-2 text-base">効果: 装備品の基本ステータスを{(item.mult * 100).toFixed(0)}%強化</div>
-          <div className="text-sm text-gray-400">武器、防具、アクセサリに使用できます</div>
+          <div className="text-sm text-gray-400">武器、防具に使用できます</div>
         </div>
       );
     }
@@ -168,17 +168,147 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
               <span className="font-bold">{v}</span>
             </div>
           ))}
-          {item.options && item.options.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-700">
-              <div className="text-base text-gray-500 mb-2 font-bold">オプション:</div>
-              {item.options.map((opt, idx) => (
-                <div key={idx} className={`text-base mb-1 ${opt.isSpecial ? 'text-yellow-400' : 'text-gray-300'}`}>
-                  {opt.isSpecial && <span className="text-yellow-400">★ </span>}
-                  {opt.label} +{opt.val}{opt.unit || ''}
+          {item.options && item.options.length > 0 && (() => {
+            // オプション表示ロジック（renderMergedOptionsと同じ）
+            if (optionDisplayMode === 'split') {
+              // スロットごとに分けて表示
+              return (
+                <div className="mt-3 pt-3 border-t border-gray-700">
+                  <div className="text-base text-gray-500 mb-2 font-bold">オプション:</div>
+                  {item.options.map((opt, idx) => {
+                    if (opt.isComposite && opt.compositeVals) {
+                      // 複合オプションの場合
+                      return (
+                        <div key={idx} className="py-2 border-b border-gray-800 last:border-0">
+                          <div className="text-sm text-purple-300 font-bold mb-1">[{idx + 1}] {opt.label} (複合)</div>
+                          {opt.compositeVals.map((compVal, compIdx) => {
+                            const compOpt = BASIC_OPTIONS.find(o => o.type === compVal.type) || 
+                                           (equipmentType && EQUIPMENT_TYPE_OPTIONS[equipmentType]?.find(o => o.type === compVal.type));
+                            return (
+                              <div key={compIdx} className="flex justify-between items-center pl-4 text-xs text-gray-300">
+                                <span>{compOpt?.label || compVal.type}</span>
+                                <span>+{compVal.val}{compOpt?.unit || ''}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    } else {
+                      // 通常のオプション
+                      return (
+                        <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0">
+                          <span className={`text-sm ${opt.isSpecial ? 'text-yellow-400 font-bold' : 'text-blue-200'}`}>
+                            [{idx + 1}] {opt.label}
+                          </span>
+                          <span className={`text-base font-bold ${opt.isSpecial ? 'text-yellow-400' : 'text-blue-200'}`}>
+                            +{opt.val}{opt.unit || ''}
+                          </span>
+                        </div>
+                      );
+                    }
+                  })}
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            } else if (optionDisplayMode === 'composite') {
+              // 複合オプションは複合として表示、通常オプションは統合表示
+              const merged = item.options.reduce((acc, opt) => {
+                if (opt.isComposite && opt.compositeVals) {
+                  // 複合オプションは複合として表示
+                  const compositeKey = opt.label || opt.type;
+                  if (!acc[compositeKey]) {
+                    acc[compositeKey] = { 
+                      label: opt.label, 
+                      isComposite: true,
+                      compositeVals: [],
+                      isSpecial: opt.isSpecial 
+                    };
+                  }
+                  opt.compositeVals.forEach(compVal => {
+                    const existing = acc[compositeKey].compositeVals.find(cv => cv.type === compVal.type);
+                    if (existing) {
+                      existing.val += compVal.val;
+                    } else {
+                      acc[compositeKey].compositeVals.push({ ...compVal });
+                    }
+                  });
+                } else {
+                  // 通常オプションは統合表示
+                  if (!acc[opt.label]) acc[opt.label] = { ...opt, val: 0 };
+                  acc[opt.label].val += opt.val;
+                  if (opt.isSpecial) acc[opt.label].isSpecial = true;
+                }
+                return acc;
+              }, {});
+              
+              return (
+                <div className="mt-3 pt-3 border-t border-gray-700">
+                  <div className="text-base text-gray-500 mb-2 font-bold">オプション:</div>
+                  {Object.values(merged).map((opt, idx) => {
+                    if (opt.isComposite && opt.compositeVals) {
+                      // 複合オプションの表示
+                      return (
+                        <div key={idx} className="py-2 border-b border-gray-800 last:border-0">
+                          <div className={`text-sm text-purple-300 font-bold mb-1 ${opt.isSpecial ? 'text-yellow-400' : ''}`}>
+                            {opt.isSpecial && <span className="text-yellow-400">★ </span>}
+                            {opt.label} (複合)
+                          </div>
+                          {opt.compositeVals.map((compVal, compIdx) => {
+                            const compOpt = BASIC_OPTIONS.find(o => o.type === compVal.type) || 
+                                           (equipmentType && EQUIPMENT_TYPE_OPTIONS[equipmentType]?.find(o => o.type === compVal.type));
+                            return (
+                              <div key={compIdx} className="flex justify-between items-center pl-4 text-xs text-gray-300">
+                                <span>{compOpt?.label || compVal.type}</span>
+                                <span>+{compVal.val}{compOpt?.unit || ''}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    } else {
+                      // 通常オプションの表示
+                      return (
+                        <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0 last:mb-0">
+                          <span className={`text-sm ${opt.isSpecial ? 'text-yellow-400 font-bold' : 'text-blue-200'}`}>{opt.label}</span>
+                          <span className={`text-base font-bold ${opt.isSpecial ? 'text-yellow-400' : 'text-blue-200'}`}>+{opt.val}{opt.unit || ''}</span>
+                        </div>
+                      );
+                    }
+                  })}
+                </div>
+              );
+            } else {
+              // merged: すべて統合表示（複合オプションも個別に展開）
+              const merged = item.options.reduce((acc, opt) => {
+                if (opt.isComposite && opt.compositeVals) {
+                  // 複合オプションは個別に処理
+                  opt.compositeVals.forEach(compVal => {
+                    const compOpt = BASIC_OPTIONS.find(o => o.type === compVal.type) || 
+                                   (equipmentType && EQUIPMENT_TYPE_OPTIONS[equipmentType]?.find(o => o.type === compVal.type));
+                    const label = compOpt?.label || compVal.type;
+                    if (!acc[label]) acc[label] = { label, val: 0, unit: compOpt?.unit || '', isSpecial: opt.isSpecial };
+                    acc[label].val += compVal.val;
+                  });
+                } else {
+                  if (!acc[opt.label]) acc[opt.label] = { ...opt, val: 0 };
+                  acc[opt.label].val += opt.val;
+                  if (opt.isSpecial) acc[opt.label].isSpecial = true;
+                }
+                return acc;
+              }, {});
+              
+              return (
+                <div className="mt-3 pt-3 border-t border-gray-700">
+                  <div className="text-base text-gray-500 mb-2 font-bold">オプション:</div>
+                  {Object.values(merged).map((opt, idx) => (
+                    <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0 last:mb-0">
+                      <span className={`text-sm ${opt.isSpecial ? 'text-yellow-400 font-bold' : 'text-blue-200'}`}>{opt.label}</span>
+                      <span className={`text-base font-bold ${opt.isSpecial ? 'text-yellow-400' : 'text-blue-200'}`}>+{opt.val}{opt.unit || ''}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+          })()}
         </div>
       );
     }

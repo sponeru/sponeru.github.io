@@ -22,7 +22,6 @@ export const INITIAL_PLAYER = {
 export const INITIAL_EQUIPMENT = {
   weapon: { id: 'init_w', name: "木の棒", type: "weapon", baseStats: { atk: 2 }, options: [], rarity: "common", power: 1 },
   armor: { id: 'init_a', name: "ボロボロの服", type: "armor", baseStats: { def: 1 }, options: [], rarity: "common", power: 1 },
-  accessory: null,
   amulet: null,
   ring1: null,
   ring2: null,
@@ -89,11 +88,27 @@ export const BASIC_OPTIONS = [
   { type: 'atk', label: '攻撃力', weight: 5 },
   { type: 'def', label: '防御力', weight: 5 },
   { type: 'maxHp', label: '最大HP', weight: 8 },
+  { type: 'maxMp', label: '最大MP', weight: 5 },
   { type: 'res_fire', label: '火耐性', unit: '%', weight: 5, isRes: true },
   { type: 'res_ice', label: '氷耐性', unit: '%', weight: 5, isRes: true },
   { type: 'res_thunder', label: '雷耐性', unit: '%', weight: 5, isRes: true },
   { type: 'res_light', label: '光耐性', unit: '%', weight: 5, isRes: true },
   { type: 'res_dark', label: '闇耐性', unit: '%', weight: 5, isRes: true },
+  // 装備タイプ別の特殊オプション
+  { type: 'atk_mult', label: '装備ATK上昇', unit: '%', weight: 3, isPercent: true },
+  { type: 'def_mult', label: '装備防御力上昇', unit: '%', weight: 3, isPercent: true },
+  { type: 'hp_mult', label: '装備HP上昇', unit: '%', weight: 3, isPercent: true },
+  { type: 'dmg_mult', label: 'ダメージ増加', unit: '%', weight: 3, isPercent: true },
+  { type: 'crit_mult', label: '会心率上昇', unit: '%', weight: 3, isPercent: true },
+  { type: 'critDmg_mult', label: '会心ダメージ上昇', unit: '%', weight: 3, isPercent: true },
+  { type: 'global_hp_mult', label: 'HP上昇(グローバル)', unit: '%', weight: 3, isPercent: true },
+  { type: 'global_maxMp_mult', label: '最大MP上昇(グローバル)', unit: '%', weight: 3, isPercent: true },
+  { type: 'hp_regen', label: 'HP自動回復', unit: '/秒', weight: 2 },
+  { type: 'skill_level_fire', label: '火属性スキルLv', weight: 2, isSkillLevel: true, element: 'fire' },
+  { type: 'skill_level_ice', label: '氷属性スキルLv', weight: 2, isSkillLevel: true, element: 'ice' },
+  { type: 'skill_level_thunder', label: '雷属性スキルLv', weight: 2, isSkillLevel: true, element: 'thunder' },
+  { type: 'skill_level_light', label: '光属性スキルLv', weight: 2, isSkillLevel: true, element: 'light' },
+  { type: 'skill_level_dark', label: '闇属性スキルLv', weight: 2, isSkillLevel: true, element: 'dark' },
 ];
 
 export const SPECIAL_OPTIONS = [
@@ -102,6 +117,153 @@ export const SPECIAL_OPTIONS = [
   { type: 'exp', label: 'EXP獲得', unit: '%', min: 10, max: 50 },
   { type: 'critDmg', label: '会心ダメ', unit: '%', min: 20, max: 100 },
 ];
+
+// 複合オプション定義
+// 複合オプションは2つのオプションタイプを組み合わせたもの
+export const COMPOSITE_OPTIONS = [
+  // 属性耐性の複合
+  { 
+    type: 'composite_res_fire_ice', 
+    label: '火+氷耐性', 
+    compositeTypes: ['res_fire', 'res_ice'],
+    weight: 2,
+    isComposite: true 
+  },
+  { 
+    type: 'composite_res_fire_thunder', 
+    label: '火+雷耐性', 
+    compositeTypes: ['res_fire', 'res_thunder'],
+    weight: 2,
+    isComposite: true 
+  },
+  { 
+    type: 'composite_res_ice_thunder', 
+    label: '氷+雷耐性', 
+    compositeTypes: ['res_ice', 'res_thunder'],
+    weight: 2,
+    isComposite: true 
+  },
+  { 
+    type: 'composite_res_light_dark', 
+    label: '光+闇耐性', 
+    compositeTypes: ['res_light', 'res_dark'],
+    weight: 2,
+    isComposite: true 
+  },
+  // HP関連の複合
+  { 
+    type: 'composite_maxHp_hpRegen', 
+    label: '最大HP+HP自動回復', 
+    compositeTypes: ['maxHp', 'hp_regen'],
+    weight: 2,
+    isComposite: true 
+  },
+  // 能力値の複合
+  { 
+    type: 'composite_str_vit', 
+    label: '筋力+体力', 
+    compositeTypes: ['str', 'vit'],
+    weight: 2,
+    isComposite: true 
+  },
+  { 
+    type: 'composite_str_dex', 
+    label: '筋力+幸運', 
+    compositeTypes: ['str', 'dex'],
+    weight: 2,
+    isComposite: true 
+  },
+  { 
+    type: 'composite_vit_dex', 
+    label: '体力+幸運', 
+    compositeTypes: ['vit', 'dex'],
+    weight: 2,
+    isComposite: true 
+  },
+  // 会心関連の複合
+  { 
+    type: 'composite_crit_critDmg', 
+    label: '会心率+会心ダメージ', 
+    compositeTypes: ['crit_mult', 'critDmg_mult'],
+    weight: 1,
+    isComposite: true 
+  },
+];
+
+// 装備タイプごとのオプションプール
+export const EQUIPMENT_TYPE_OPTIONS = {
+  weapon: [
+    { type: 'atk_mult', label: '装備ATK上昇', unit: '%', isPercent: true },
+    { type: 'str', label: '筋力' },
+    { type: 'vit', label: '体力' },
+    { type: 'dex', label: '幸運' },
+    { type: 'skill_level_fire', label: '火属性スキルLv', isSkillLevel: true, element: 'fire' },
+    { type: 'skill_level_ice', label: '氷属性スキルLv', isSkillLevel: true, element: 'ice' },
+    { type: 'skill_level_thunder', label: '雷属性スキルLv', isSkillLevel: true, element: 'thunder' },
+    { type: 'skill_level_light', label: '光属性スキルLv', isSkillLevel: true, element: 'light' },
+    { type: 'skill_level_dark', label: '闇属性スキルLv', isSkillLevel: true, element: 'dark' },
+    { type: 'dmg_mult', label: 'ダメージ増加', unit: '%', isPercent: true },
+    { type: 'crit_mult', label: '会心率上昇', unit: '%', isPercent: true },
+    { type: 'critDmg_mult', label: '会心ダメージ上昇', unit: '%', isPercent: true },
+    { type: 'maxMp', label: '最大MP' },
+  ],
+  armor: [
+    { type: 'res_fire', label: '火耐性', unit: '%', isRes: true },
+    { type: 'res_ice', label: '氷耐性', unit: '%', isRes: true },
+    { type: 'res_thunder', label: '雷耐性', unit: '%', isRes: true },
+    { type: 'res_light', label: '光耐性', unit: '%', isRes: true },
+    { type: 'res_dark', label: '闇耐性', unit: '%', isRes: true },
+    { type: 'def_mult', label: '装備防御力上昇', unit: '%', isPercent: true },
+    { type: 'hp_mult', label: '装備HP上昇', unit: '%', isPercent: true },
+    { type: 'maxHp', label: '最大HP' },
+  ],
+  amulet: [
+    { type: 'res_fire', label: '火耐性', unit: '%', isRes: true },
+    { type: 'res_ice', label: '氷耐性', unit: '%', isRes: true },
+    { type: 'res_thunder', label: '雷耐性', unit: '%', isRes: true },
+    { type: 'res_light', label: '光耐性', unit: '%', isRes: true },
+    { type: 'res_dark', label: '闇耐性', unit: '%', isRes: true },
+    { type: 'global_hp_mult', label: 'HP上昇(グローバル)', unit: '%', isPercent: true },
+    { type: 'global_maxMp_mult', label: '最大MP上昇(グローバル)', unit: '%', isPercent: true },
+    { type: 'str', label: '筋力' },
+    { type: 'vit', label: '体力' },
+    { type: 'dex', label: '幸運' },
+    { type: 'crit_mult', label: '会心率上昇', unit: '%', isPercent: true },
+    { type: 'critDmg_mult', label: '会心ダメージ上昇', unit: '%', isPercent: true },
+  ],
+  ring: [
+    { type: 'res_fire', label: '火耐性', unit: '%', isRes: true },
+    { type: 'res_ice', label: '氷耐性', unit: '%', isRes: true },
+    { type: 'res_thunder', label: '雷耐性', unit: '%', isRes: true },
+    { type: 'res_light', label: '光耐性', unit: '%', isRes: true },
+    { type: 'res_dark', label: '闇耐性', unit: '%', isRes: true },
+    { type: 'maxHp', label: '最大HP' },
+    { type: 'def', label: '防御力' },
+    { type: 'maxMp', label: '最大MP' },
+  ],
+  belt: [
+    { type: 'res_fire', label: '火耐性', unit: '%', isRes: true },
+    { type: 'res_ice', label: '氷耐性', unit: '%', isRes: true },
+    { type: 'res_thunder', label: '雷耐性', unit: '%', isRes: true },
+    { type: 'res_light', label: '光耐性', unit: '%', isRes: true },
+    { type: 'res_dark', label: '闇耐性', unit: '%', isRes: true },
+    { type: 'maxHp', label: '最大HP' },
+    { type: 'def', label: '防御力' },
+    { type: 'maxMp', label: '最大MP' },
+    { type: 'hp_regen', label: 'HP自動回復', unit: '/秒' },
+  ],
+  feet: [
+    { type: 'res_fire', label: '火耐性', unit: '%', isRes: true },
+    { type: 'res_ice', label: '氷耐性', unit: '%', isRes: true },
+    { type: 'res_thunder', label: '雷耐性', unit: '%', isRes: true },
+    { type: 'res_light', label: '光耐性', unit: '%', isRes: true },
+    { type: 'res_dark', label: '闇耐性', unit: '%', isRes: true },
+    { type: 'def_mult', label: '装備防御力上昇', unit: '%', isPercent: true },
+    { type: 'hp_mult', label: '装備HP上昇', unit: '%', isPercent: true },
+    { type: 'maxHp', label: '最大HP' },
+    { type: 'maxMp', label: '最大MP' },
+  ],
+};
 
 export const STONE_MODS = [
   { type: 'risk_hp', label: '敵HP', valMin: 20, valMax: 100, unit: '%', isRisk: true },
@@ -128,8 +290,12 @@ export const MONSTER_NAMES = [
 export const ITEM_PREFIXES = ["錆びた", "普通の", "鋭い", "重厚な", "疾風の", "達人の", "勇者の", "魔王の", "神々の"];
 export const WEAPON_NAMES = ["ダガー", "ソード", "アックス", "メイス", "カタナ", "グレートソード"];
 export const ARMOR_NAMES = ["ローブ", "レザー", "メイル", "プレート", "フルプレート"];
-export const ACC_NAMES = ["タリスマン", "オーブ"];
 export const AMULET_NAMES = ["アミュレット", "ペンダント", "首飾り", "護符"];
+export const STAT_LABELS = {
+  str: "筋力",
+  vit: "体力",
+  dex: "幸運",
+};
 export const RING_NAMES = ["リング", "指輪", "シグネット", "結婚指輪"];
 export const BELT_NAMES = ["ベルト", "帯", "サッシュ", "ウエストバッグ"];
 export const FEET_NAMES = ["ブーツ", "シューズ", "サンダル", "グリーブ"];

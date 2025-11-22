@@ -16,6 +16,8 @@ export const ItemSlot = React.memo(({
   onDragOver,
   isDropTarget = false,
   dragSource = null,
+  optionDisplayMode = 'merged',
+  equipmentType = null,
 }) => {
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [tooltipPlacement, setTooltipPlacement] = useState('top');
@@ -218,6 +220,8 @@ export const ItemSlot = React.memo(({
           isVisible={showTooltip}
           placement={tooltipPlacement}
           positionType="fixed"
+          optionDisplayMode={optionDisplayMode}
+          equipmentType={equipmentType || item?.type}
         />
       )}
       </>

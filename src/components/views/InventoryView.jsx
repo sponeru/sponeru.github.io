@@ -20,6 +20,7 @@ export const InventoryView = ({
   handleDragOver,
   handleDrop,
   setDragOverTarget,
+  optionDisplayMode = 'merged',
 }) => {
   return (
     <div className="p-8 bg-gray-900 min-h-full">
@@ -52,6 +53,8 @@ export const InventoryView = ({
                   onDragEnd={handleDragEnd}
                   isDropTarget={dragOverTarget === `equipment_${slot}`}
                   dragSource={draggedItem}
+                  optionDisplayMode={optionDisplayMode}
+                  equipmentType={slot}
                 />
               </div>
               <span className="text-xs text-gray-500 uppercase text-center">{getSlotLabel(slot)}</span>
@@ -84,6 +87,8 @@ export const InventoryView = ({
                   onDragEnd={handleDragEnd}
                   isDropTarget={dragOverTarget === `equipment_skill${num}`}
                   dragSource={draggedItem}
+                  optionDisplayMode={optionDisplayMode}
+                  equipmentType="skill"
                 />
               </div>
               <span className="text-xs text-gray-500 uppercase">スキル {num}</span>
@@ -152,6 +157,8 @@ export const InventoryView = ({
                 onDragEnd={handleDragEnd}
                 isDropTarget={dragOverTarget === 'inventory' && draggedItem?.source === 'warehouse'}
                 dragSource={draggedItem}
+                optionDisplayMode={optionDisplayMode}
+                equipmentType={item?.type}
               />
             ))}
           </div>
@@ -184,6 +191,8 @@ export const InventoryView = ({
                 onDragEnd={handleDragEnd}
                 isDropTarget={dragOverTarget === 'warehouse' && draggedItem?.source === 'inventory'}
                 dragSource={draggedItem}
+                optionDisplayMode={optionDisplayMode}
+                equipmentType={item?.type}
               />
             ))}
             {warehouse.length === 0 && (

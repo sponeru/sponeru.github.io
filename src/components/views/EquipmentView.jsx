@@ -20,6 +20,7 @@ export const EquipmentView = ({
   handleDrop,
   setDragOverTarget,
   useItemOnEquipment,
+  optionDisplayMode = 'merged',
 }) => {
   const equipmentItemTypes = ['enhancement_stone', 'enchant_scroll', 'element_stone', 'special_stone', 'reroll_scroll', 'option_slot_stone', 'rarity_upgrade_stone'];
   const equipmentItems = inventory.filter(i => equipmentItemTypes.includes(i.type));
@@ -75,6 +76,8 @@ export const EquipmentView = ({
                     onDragStart={item ? (e) => handleDragStart(e, item, `equipment_${slot}`) : undefined}
                     onDragEnd={handleDragEnd}
                     dragSource={draggedItem}
+                    optionDisplayMode={optionDisplayMode}
+                    equipmentType={slot}
                   />
                 </div>
                 <span className="text-xs text-gray-400 text-center">{getSlotLabel(slot)}</span>
@@ -105,6 +108,8 @@ export const EquipmentView = ({
               onDragStart={(e) => handleDragStart(e, item, 'inventory')}
               onDragEnd={handleDragEnd}
               dragSource={draggedItem}
+              optionDisplayMode={optionDisplayMode}
+              equipmentType={item?.type}
             />
           ))}
           {equipmentItems.length === 0 && (
@@ -146,6 +151,8 @@ export const EquipmentView = ({
                         setEquipmentItemMode(null);
                       }}
                       iconSize={32}
+                      optionDisplayMode={optionDisplayMode}
+                      equipmentType={slot}
                     />
                   </div>
                   <span className="text-xs text-gray-400 text-center">{getSlotLabel(slot)}</span>
@@ -168,6 +175,8 @@ export const EquipmentView = ({
                       setEquipmentItemMode(null);
                     }}
                     isSelected={selectedItem?.id === item.id}
+                    optionDisplayMode={optionDisplayMode}
+                    equipmentType={item?.type}
                   />
                 ))}
                 {inventory.filter(i => EQUIPMENT_TYPES.includes(i.type)).length === 0 && (
@@ -190,6 +199,8 @@ export const EquipmentView = ({
                       useItemOnEquipment(equipmentItemMode, item, true);
                       setEquipmentItemMode(null);
                     }}
+                    optionDisplayMode={optionDisplayMode}
+                    equipmentType={item?.type}
                   />
                 ))}
                 {warehouse.filter(i => EQUIPMENT_TYPES.includes(i.type)).length === 0 && (

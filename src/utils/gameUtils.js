@@ -4,7 +4,6 @@ export const getSlotLabel = (slot) => {
   const labels = {
     weapon: '武器',
     armor: '防具',
-    accessory: 'アクセサリ',
     amulet: 'アミュレット',
     ring1: 'リング1',
     ring2: 'リング2',
@@ -19,8 +18,8 @@ export const getSlotType = (slot) => {
   return slot;
 };
 
-export const EQUIPMENT_SLOTS = ['weapon', 'armor', 'accessory', 'amulet', 'ring1', 'ring2', 'belt', 'feet'];
-export const EQUIPMENT_TYPES = ['weapon', 'armor', 'accessory', 'amulet', 'ring', 'belt', 'feet'];
+export const EQUIPMENT_SLOTS = ['weapon', 'armor', 'amulet', 'ring1', 'ring2', 'belt', 'feet'];
+export const EQUIPMENT_TYPES = ['weapon', 'armor', 'amulet', 'ring', 'belt', 'feet'];
 
 // 装備品用アイテムがスタック可能かチェック
 export const canStackEquipmentItem = (item1, item2) => {

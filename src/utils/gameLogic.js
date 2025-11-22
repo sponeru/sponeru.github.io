@@ -6,13 +6,15 @@ import {
   INK_RARE_MODS,
   BASIC_OPTIONS,
   SPECIAL_OPTIONS,
+  EQUIPMENT_TYPE_OPTIONS,
+  COMPOSITE_OPTIONS,
   STONE_MODS,
   MONSTER_NAMES,
   ITEM_PREFIXES,
   WEAPON_NAMES,
   ARMOR_NAMES,
-  ACC_NAMES,
   AMULET_NAMES,
+  STAT_LABELS,
   RING_NAMES,
   BELT_NAMES,
   FEET_NAMES,
@@ -58,27 +60,116 @@ export const generateEnemy = (floor, dungeonMods = {}, isFinalBoss = false) => {
   };
 };
 
-export const generateOptions = (rarityKey, power, dungeonMods = {}) => {
+export const generateOptions = (rarityKey, power, equipmentType = null, dungeonMods = {}) => {
   const options = [];
   const config = RARITIES[rarityKey];
-  let pool = [...BASIC_OPTIONS];
+  
+  // 装備タイプに応じたオプションプールを取得
+  let pool = [];
+  if (equipmentType && EQUIPMENT_TYPE_OPTIONS[equipmentType]) {
+    pool = [...EQUIPMENT_TYPE_OPTIONS[equipmentType]];
+  } else {
+    // 装備タイプが指定されていない場合は従来通りBASIC_OPTIONSを使用
+    pool = [...BASIC_OPTIONS];
+  }
+  
+  // 複合オプションをプールに追加（装備タイプに応じてフィルタリング）
+  const availableCompositeOptions = COMPOSITE_OPTIONS.filter(composite => {
+    // 複合オプションの各タイプが装備タイプのプールに含まれているかチェック
+    return composite.compositeTypes.every(compType => {
+      return pool.some(opt => opt.type === compType) || 
+             BASIC_OPTIONS.some(opt => opt.type === compType);
+    });
+  });
+  pool = [...pool, ...availableCompositeOptions];
+  
   let specialPool = [...SPECIAL_OPTIONS];
 
   for (let i = 0; i < config.optCount; i++) {
-    const optType = pool[randomInt(0, pool.length - 1)];
-    let val = Math.max(1, Math.floor(power * (randomInt(5, 15) / 100)));
+    if (pool.length === 0) break;
     
-    if (optType.type === 'maxHp') val *= 5;
-    if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
-    if (optType.isRes) val = randomInt(5, 20); 
+    // 既に追加したオプションタイプをプールから除外
+    // 複合オプションの場合は、含まれるタイプもチェック
+    const existingTypes = options.flatMap(opt => {
+      if (opt.isComposite && opt.compositeTypes) {
+        return [opt.type, ...opt.compositeTypes];
+      }
+      return [opt.type];
+    });
+    
+    const availablePool = pool.filter(opt => {
+      if (opt.isComposite && opt.compositeTypes) {
+        // 複合オプションの場合、含まれるタイプが既存オプションと重複しないかチェック
+        return !opt.compositeTypes.some(compType => existingTypes.includes(compType));
+      }
+      return !existingTypes.includes(opt.type);
+    });
+    
+    if (availablePool.length === 0) break;
+    
+    const optType = availablePool[randomInt(0, availablePool.length - 1)];
+    
+    // 複合オプションの場合
+    if (optType.isComposite && optType.compositeTypes) {
+      const compositeVals = optType.compositeTypes.map(compType => {
+        let val = Math.max(1, Math.floor(power * (randomInt(5, 15) / 100)));
+        const baseOpt = pool.find(o => o.type === compType) || BASIC_OPTIONS.find(o => o.type === compType);
+        if (!baseOpt) return { type: compType, val: 0 };
+        
+        if (compType === 'maxHp') val *= 5;
+        if (compType === 'maxMp') val = Math.max(1, Math.floor(power * (randomInt(3, 8) / 100)));
+        if (['str','vit','dex'].includes(compType)) val = Math.max(1, Math.floor(val / 2));
+        if (baseOpt.isRes) val = randomInt(5, 20);
+        if (baseOpt.isPercent) val = randomInt(1, 10);
+        if (baseOpt.isSkillLevel) val = randomInt(1, 5);
+        if (compType === 'hp_regen') val = randomInt(1, 5);
+        
+        return { type: compType, val };
+      });
+      
+      options.push({ 
+        ...optType, 
+        compositeVals,
+        val: 0, // 複合オプションの場合はvalは使用しない
+        isSpecial: false,
+        isComposite: true 
+      });
+    } else {
+      // 通常のオプション
+      let val = Math.max(1, Math.floor(power * (randomInt(5, 15) / 100)));
+      
+      // オプションタイプに応じた値の計算
+      if (optType.type === 'maxHp') val *= 5;
+      if (optType.type === 'maxMp') val = Math.max(1, Math.floor(power * (randomInt(3, 8) / 100)));
+      if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
+      if (optType.isRes) val = randomInt(5, 20);
+      if (optType.isPercent) {
+        // 割合オプションは1-10%の範囲
+        val = randomInt(1, 10);
+      }
+      if (optType.isSkillLevel) {
+        // スキルレベルは1-5の範囲
+        val = randomInt(1, 5);
+      }
+      if (optType.type === 'hp_regen') {
+        // HP自動回復は1-5/秒の範囲
+        val = randomInt(1, 5);
+      }
 
-    options.push({ ...optType, val, isSpecial: false });
+      options.push({ ...optType, val, isSpecial: false });
+    }
   }
 
   if (rarityKey === 'legendary') {
-    const special = specialPool[randomInt(0, specialPool.length - 1)];
-    const val = randomInt(special.min, special.max);
-    options.push({ ...special, val, isSpecial: true });
+    // 既に追加したオプションタイプをプールから除外
+    const existingTypes = options.map(opt => opt.type);
+    const availableSpecialPool = specialPool.filter(opt => !existingTypes.includes(opt.type));
+    
+    if (availableSpecialPool.length > 0) {
+      const special = availableSpecialPool[randomInt(0, availableSpecialPool.length - 1)];
+      const val = randomInt(special.min, special.max);
+      options.push({ ...special, val, isSpecial: true });
+    }
   }
   return options;
 };
@@ -140,33 +231,32 @@ export const generateLoot = (floor, dungeonMods = {}) => {
     baseName = ARMOR_NAMES[randomInt(0, ARMOR_NAMES.length - 1)];
     baseStats.def = Math.floor(power * randomInt(8, 12) / 20) + 1;
     baseStats.hp = Math.floor(power * 2);
-  } else if (typeRoll < 0.65) {
-    type = "accessory";
-    baseName = ACC_NAMES[randomInt(0, ACC_NAMES.length - 1)];
-    baseStats.str = Math.floor(power / 15);
-    baseStats.vit = Math.floor(power / 15);
-  } else if (typeRoll < 0.70) {
+  } else if (typeRoll < 0.60) {
     type = "amulet";
-    baseName = AMULET_NAMES[randomInt(0, AMULET_NAMES.length - 1)];
-    baseStats.str = Math.floor(power / 12);
-    baseStats.vit = Math.floor(power / 12);
-    baseStats.dex = Math.floor(power / 12);
-  } else if (typeRoll < 0.73) {
+    // 能力値の種類をランダムに選ぶ
+    const statTypes = ['str', 'vit', 'dex'];
+    const selectedStat = statTypes[randomInt(0, statTypes.length - 1)];
+    // 選んだ能力値のみに値を設定
+    baseStats[selectedStat] = Math.floor(power / 8);
+    // 能力値の種類に応じて名前を変更
+    const baseAmuletName = AMULET_NAMES[randomInt(0, AMULET_NAMES.length - 1)];
+    baseName = `${STAT_LABELS[selectedStat]}の${baseAmuletName}`;
+  } else if (typeRoll < 0.63) {
     type = "ring";
     baseName = RING_NAMES[randomInt(0, RING_NAMES.length - 1)];
     baseStats.str = Math.floor(power / 12);
     baseStats.vit = Math.floor(power / 12);
-  } else if (typeRoll < 0.76) {
+  } else if (typeRoll < 0.66) {
     type = "belt";
     baseName = BELT_NAMES[randomInt(0, BELT_NAMES.length - 1)];
     baseStats.vit = Math.floor(power / 10);
     baseStats.hp = Math.floor(power * 1.5);
-  } else if (typeRoll < 0.79) {
+  } else if (typeRoll < 0.69) {
     type = "feet";
     baseName = FEET_NAMES[randomInt(0, FEET_NAMES.length - 1)];
     baseStats.def = Math.floor(power * randomInt(5, 8) / 20) + 1;
     baseStats.dex = Math.floor(power / 12);
-  } else if (typeRoll < 0.90) {
+  } else if (typeRoll < 0.80) {
     type = "skill";
     const templates = SKILL_TEMPLATES.filter(s => !s.rarity || s.rarity === rarityKey);
     const template = templates.length > 0 ? templates[randomInt(0, templates.length - 1)] : SKILL_TEMPLATES[0];
@@ -201,7 +291,7 @@ export const generateLoot = (floor, dungeonMods = {}) => {
     return generateInk(floor);
   }
 
-  const options = type === 'skill' ? [] : generateOptions(rarityKey, power, dungeonMods);
+  const options = type === 'skill' ? [] : generateOptions(rarityKey, power, type, dungeonMods);
   const prefix = type === 'skill' ? '' : ITEM_PREFIXES[Math.min(Math.floor(floor / 10), ITEM_PREFIXES.length - 1)];
   
   const item = {
