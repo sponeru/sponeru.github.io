@@ -13,7 +13,7 @@ export const INITIAL_PLAYER = {
   maxHp: 100,
   mp: 50,
   maxMp: 50,
-  stats: { str: 5, vit: 5, dex: 5 },
+  stats: { str: 5, dex: 5, int: 5 },
   skillPoints: 0,
   learnedSkills: {}, // { skillId: level }
   buffs: [],
@@ -83,8 +83,8 @@ export const INK_RARE_MODS = [
 
 export const BASIC_OPTIONS = [
   { type: 'str', label: '筋力', weight: 10 },
-  { type: 'vit', label: '体力', weight: 10 },
-  { type: 'dex', label: '幸運', weight: 10 },
+  { type: 'dex', label: '器用さ', weight: 10 },
+  { type: 'int', label: '知恵', weight: 10 },
   { type: 'atk', label: '攻撃力', weight: 5 },
   { type: 'def', label: '防御力', weight: 5 },
   { type: 'maxHp', label: '最大HP', weight: 8 },
@@ -160,23 +160,23 @@ export const COMPOSITE_OPTIONS = [
   },
   // 能力値の複合
   { 
-    type: 'composite_str_vit', 
-    label: '筋力+体力', 
-    compositeTypes: ['str', 'vit'],
+    type: 'composite_str_int', 
+    label: '筋力+知恵', 
+    compositeTypes: ['str', 'int'],
     weight: 2,
     isComposite: true 
   },
   { 
     type: 'composite_str_dex', 
-    label: '筋力+幸運', 
+    label: '筋力+器用さ', 
     compositeTypes: ['str', 'dex'],
     weight: 2,
     isComposite: true 
   },
   { 
-    type: 'composite_vit_dex', 
-    label: '体力+幸運', 
-    compositeTypes: ['vit', 'dex'],
+    type: 'composite_dex_int', 
+    label: '器用さ+知恵', 
+    compositeTypes: ['dex', 'int'],
     weight: 2,
     isComposite: true 
   },
@@ -195,8 +195,8 @@ export const EQUIPMENT_TYPE_OPTIONS = {
   weapon: [
     { type: 'atk_mult', label: '装備ATK上昇', unit: '%', isPercent: true },
     { type: 'str', label: '筋力' },
-    { type: 'vit', label: '体力' },
-    { type: 'dex', label: '幸運' },
+    { type: 'dex', label: '器用さ' },
+    { type: 'int', label: '知恵' },
     { type: 'skill_level_fire', label: '火属性スキルLv', isSkillLevel: true, element: 'fire' },
     { type: 'skill_level_ice', label: '氷属性スキルLv', isSkillLevel: true, element: 'ice' },
     { type: 'skill_level_thunder', label: '雷属性スキルLv', isSkillLevel: true, element: 'thunder' },
@@ -226,8 +226,8 @@ export const EQUIPMENT_TYPE_OPTIONS = {
     { type: 'global_hp_mult', label: 'HP上昇(グローバル)', unit: '%', isPercent: true },
     { type: 'global_maxMp_mult', label: '最大MP上昇(グローバル)', unit: '%', isPercent: true },
     { type: 'str', label: '筋力' },
-    { type: 'vit', label: '体力' },
-    { type: 'dex', label: '幸運' },
+    { type: 'dex', label: '器用さ' },
+    { type: 'int', label: '知恵' },
     { type: 'crit_mult', label: '会心率上昇', unit: '%', isPercent: true },
     { type: 'critDmg_mult', label: '会心ダメージ上昇', unit: '%', isPercent: true },
   ],
@@ -277,6 +277,14 @@ export const STONE_MODS = [
   { type: 'mod_floor_sub', label: '階層', valMin: 1, valMax: 3, unit: '階減', isReward: true }, 
 ];
 
+// リスクに対応する報酬のマッピング
+export const RISK_REWARD_MAPPING = {
+  'risk_hp': ['reward_exp', 'reward_gold'], // 敵HP増加 → EXP/Gold増加
+  'risk_atk': ['reward_exp', 'reward_gold'], // 敵攻撃力増加 → EXP/Gold増加
+  'risk_dmg': ['reward_drop', 'qual_rarity'], // 被ダメ増加 → 装備数/レア度向上
+  'mod_floor_add': ['mod_floor_sub', 'reward_exp', 'reward_gold'], // 階層増加 → 階層減少/EXP/Gold増加
+};
+
 export const MONSTER_NAMES = [
   { name: "スライム", icon: "💧", baseHp: 20, baseExp: 10, baseGold: 2 },
   { name: "コウモリ", icon: "🦇", baseHp: 35, baseExp: 15, baseGold: 5 },
@@ -293,8 +301,8 @@ export const ARMOR_NAMES = ["ローブ", "レザー", "メイル", "プレート
 export const AMULET_NAMES = ["アミュレット", "ペンダント", "首飾り", "護符"];
 export const STAT_LABELS = {
   str: "筋力",
-  vit: "体力",
-  dex: "幸運",
+  dex: "器用さ",
+  int: "知恵",
 };
 export const RING_NAMES = ["リング", "指輪", "シグネット", "結婚指輪"];
 export const BELT_NAMES = ["ベルト", "帯", "サッシュ", "ウエストバッグ"];
@@ -417,22 +425,22 @@ export const SKILL_TREE = [
     { effect: 'str', value: 1 },
   ]),
   
-  // 第2行: 基本スキル（体力強化 Lv1-5）
-  ...createSkillNode('base_vit', '体力強化', '体力が+1', SKILL_CATEGORIES.DEFENSE, <Shield size={20} />, 1, 0, [
-    { effect: 'vit', value: 1 },
-    { effect: 'vit', value: 1 },
-    { effect: 'vit', value: 1 },
-    { effect: 'vit', value: 1 },
-    { effect: 'vit', value: 1 },
+  // 第2行: 基本スキル（器用さ強化 Lv1-5）
+  ...createSkillNode('base_dex', '器用さ強化', '器用さが+1', SKILL_CATEGORIES.UTILITY, <Sparkles size={20} />, 1, 0, [
+    { effect: 'dex', value: 1 },
+    { effect: 'dex', value: 1 },
+    { effect: 'dex', value: 1 },
+    { effect: 'dex', value: 1 },
+    { effect: 'dex', value: 1 },
   ]),
   
-  // 第3行: 基本スキル（幸運強化 Lv1-5）
-  ...createSkillNode('base_dex', '幸運強化', '幸運が+1', SKILL_CATEGORIES.UTILITY, <Sparkles size={20} />, 2, 0, [
-    { effect: 'dex', value: 1 },
-    { effect: 'dex', value: 1 },
-    { effect: 'dex', value: 1 },
-    { effect: 'dex', value: 1 },
-    { effect: 'dex', value: 1 },
+  // 第3行: 基本スキル（知恵強化 Lv1-5）
+  ...createSkillNode('base_int', '知恵強化', '知恵が+1', SKILL_CATEGORIES.UTILITY, <ZapIcon size={20} />, 2, 0, [
+    { effect: 'int', value: 1 },
+    { effect: 'int', value: 1 },
+    { effect: 'int', value: 1 },
+    { effect: 'int', value: 1 },
+    { effect: 'int', value: 1 },
   ]),
   
   // 第4行: 攻撃力強化 Lv1-3（前提: base_str_5）
@@ -456,26 +464,26 @@ export const SKILL_TREE = [
     { effect: 'vamp', value: 2 },
   ], ['base_str_5']),
   
-  // 第7行: 防御力強化 Lv1-3（前提: base_vit_5）
+  // 第7行: 防御力強化 Lv1-3（前提: base_str_5）
   ...createSkillNode('def_boost', '防御力強化', '防御力が+5%', SKILL_CATEGORIES.DEFENSE, <ShieldIcon size={20} />, 6, 0, [
     { effect: 'def_mult', value: 0.05 },
     { effect: 'def_mult', value: 0.05 },
     { effect: 'def_mult', value: 0.05 },
-  ], ['base_vit_5']),
+  ], ['base_str_5']),
   
-  // 第8行: 最大HP強化 Lv1-3（前提: base_vit_5）
+  // 第8行: 最大HP強化 Lv1-3（前提: base_str_5）
   ...createSkillNode('hp_boost', '最大HP強化', '最大HPが+10%', SKILL_CATEGORIES.DEFENSE, <Heart size={20} />, 7, 0, [
     { effect: 'hp_mult', value: 0.10 },
     { effect: 'hp_mult', value: 0.10 },
     { effect: 'hp_mult', value: 0.10 },
-  ], ['base_vit_5']),
+  ], ['base_str_5']),
   
-  // 第9行: 全属性耐性 Lv1-3（前提: base_vit_5）
+  // 第9行: 全属性耐性 Lv1-3（前提: base_str_5）
   ...createSkillNode('res_all', '全属性耐性', '全属性耐性が+5%', SKILL_CATEGORIES.DEFENSE, <ShieldIcon size={20} />, 8, 0, [
     { effect: 'res_all', value: 5 },
     { effect: 'res_all', value: 5 },
     { effect: 'res_all', value: 5 },
-  ], ['base_vit_5']),
+  ], ['base_str_5']),
   
   // 第10行: クールダウン短縮 Lv1-3（前提: base_dex_5）
   ...createSkillNode('cd_reduction', 'クールダウン短縮', 'CD速度が+10%', SKILL_CATEGORIES.UTILITY, <ZapIcon size={20} />, 9, 0, [
@@ -542,6 +550,13 @@ export const SKILL_TREE = [
     levelData: { effect: 'goldMult', value: 30, bonus: { effect: 'expMult', value: 30 } },
     icon: <Sparkles size={20} />,
   },
+  
+  // 第16行: MPマスタリー（前提: base_int_5）
+  ...createSkillNode('mp_mastery', 'MPマスタリー', '最大MPが+10%', SKILL_CATEGORIES.UTILITY, <ZapIcon size={20} />, 15, 0, [
+    { effect: 'maxMp_mult', value: 0.10 },
+    { effect: 'maxMp_mult', value: 0.10 },
+    { effect: 'maxMp_mult', value: 0.10 },
+  ], ['base_int_5']),
   
   // 第16行: 火属性マスタリー（前提: atk_boost_3）
   {

@@ -36,8 +36,10 @@ export const useBattle = ({
     let mods = {};
     let stoneName = "始まりの平原";
 
+    let stoneTier = floor; // 魔法石がない場合はfloorを使用
     if (stone) {
         floor = stone.tier; 
+        stoneTier = stone.tier;
         maxFloor = stone.maxFloor;
         stoneName = stone.name;
         stone.mods.forEach(m => {
@@ -46,7 +48,7 @@ export const useBattle = ({
         setStones(prev => prev.filter(s => s.id !== stone.id));
     }
 
-    setActiveDungeon({ floor, startFloor: floor, maxFloor, mods, stoneName });
+    setActiveDungeon({ floor, startFloor: floor, maxFloor, mods, stoneName, stoneTier });
     setEnemy(generateEnemy(floor, mods, floor === maxFloor));
     setPhase('dungeon');
     setTab('battle');
@@ -80,7 +82,8 @@ export const useBattle = ({
             const hasWarehouseSpace = warehouse.length < MAX_WAREHOUSE;
             
             if (hasInventorySpace || hasWarehouseSpace) {
-                const loot = generateLoot(floor, dMods);
+                const stoneTier = activeDungeon?.stoneTier || floor;
+                const loot = generateLoot(floor, dMods, stoneTier);
                 if (hasInventorySpace) {
                     setInventory(prev => addEquipmentItemToStack(prev, loot));
                 } else {
@@ -302,6 +305,16 @@ export const useBattle = ({
       if (enemy.hp > 0 && player.hp > 0) {
         setEnemy(prev => {
           if (prev.wait >= prev.maxWait) {
+            // 回避率チェック（器用さによる回避）
+            const evadeChance = getStats.evade || 0;
+            const isEvaded = Math.random() * 100 < evadeChance;
+            
+            if (isEvaded) {
+              addLog('回避!', 'cyan');
+              spawnFloatingText('MISS', 'cyan');
+              return { ...prev, wait: 0 };
+            }
+            
             const rawDmg = Math.max(1, Math.floor(prev.atk - getStats.def));
             let mitigation = 0;
             if (prev.element !== 'none') {

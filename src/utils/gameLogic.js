@@ -9,6 +9,7 @@ import {
   EQUIPMENT_TYPE_OPTIONS,
   COMPOSITE_OPTIONS,
   STONE_MODS,
+  RISK_REWARD_MAPPING,
   MONSTER_NAMES,
   ITEM_PREFIXES,
   WEAPON_NAMES,
@@ -118,7 +119,7 @@ export const generateOptions = (rarityKey, power, equipmentType = null, dungeonM
         
         if (compType === 'maxHp') val *= 5;
         if (compType === 'maxMp') val = Math.max(1, Math.floor(power * (randomInt(3, 8) / 100)));
-        if (['str','vit','dex'].includes(compType)) val = Math.max(1, Math.floor(val / 2));
+        if (['str','dex','int'].includes(compType)) val = Math.max(1, Math.floor(val / 2));
         if (baseOpt.isRes) val = randomInt(5, 20);
         if (baseOpt.isPercent) val = randomInt(1, 10);
         if (baseOpt.isSkillLevel) val = randomInt(1, 5);
@@ -141,7 +142,7 @@ export const generateOptions = (rarityKey, power, equipmentType = null, dungeonM
       // オプションタイプに応じた値の計算
       if (optType.type === 'maxHp') val *= 5;
       if (optType.type === 'maxMp') val = Math.max(1, Math.floor(power * (randomInt(3, 8) / 100)));
-      if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
+      if (['str','dex','int'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
       if (optType.isRes) val = randomInt(5, 20);
       if (optType.isPercent) {
         // 割合オプションは1-10%の範囲
@@ -199,7 +200,7 @@ export const generateInk = (floor) => {
   };
 };
 
-export const generateLoot = (floor, dungeonMods = {}) => {
+export const generateLoot = (floor, dungeonMods = {}, stoneTier = null) => {
   const rand = Math.random();
   const rarityBoost = (dungeonMods.qual_rarity || 0) / 100;
   
@@ -222,55 +223,74 @@ export const generateLoot = (floor, dungeonMods = {}) => {
   const tierMult = floor * 1.5;
   const power = tierMult * rarity.mult;
 
+  let requiredStats = {}; // 装備に必要な能力値
+  
   if (typeRoll < 0.3) {
     type = "weapon";
     baseName = WEAPON_NAMES[randomInt(0, WEAPON_NAMES.length - 1)];
     baseStats.atk = Math.floor(power * randomInt(8, 12) / 10) + 1;
+    // 武器は筋力を必要とする
+    requiredStats.str = Math.floor(power / 3) + randomInt(5, 15);
   } else if (typeRoll < 0.55) {
     type = "armor";
     baseName = ARMOR_NAMES[randomInt(0, ARMOR_NAMES.length - 1)];
     baseStats.def = Math.floor(power * randomInt(8, 12) / 20) + 1;
     baseStats.hp = Math.floor(power * 2);
+    // 防具は筋力を必要とする
+    requiredStats.str = Math.floor(power / 3) + randomInt(5, 15);
   } else if (typeRoll < 0.60) {
     type = "amulet";
     // 能力値の種類をランダムに選ぶ
-    const statTypes = ['str', 'vit', 'dex'];
+    const statTypes = ['str', 'dex', 'int'];
     const selectedStat = statTypes[randomInt(0, statTypes.length - 1)];
     // 選んだ能力値のみに値を設定
     baseStats[selectedStat] = Math.floor(power / 8);
     // 能力値の種類に応じて名前を変更
     const baseAmuletName = AMULET_NAMES[randomInt(0, AMULET_NAMES.length - 1)];
     baseName = `${STAT_LABELS[selectedStat]}の${baseAmuletName}`;
+    // アミュレットは知恵を必要とする
+    requiredStats.int = Math.floor(power / 3) + randomInt(5, 15);
   } else if (typeRoll < 0.63) {
     type = "ring";
     baseName = RING_NAMES[randomInt(0, RING_NAMES.length - 1)];
-    baseStats.str = Math.floor(power / 12);
-    baseStats.vit = Math.floor(power / 12);
+    baseStats.dex = Math.floor(power / 12);
+    baseStats.int = Math.floor(power / 12);
+    // リングは器用さを必要とする
+    requiredStats.dex = Math.floor(power / 3) + randomInt(5, 15);
   } else if (typeRoll < 0.66) {
     type = "belt";
     baseName = BELT_NAMES[randomInt(0, BELT_NAMES.length - 1)];
-    baseStats.vit = Math.floor(power / 10);
+    baseStats.str = Math.floor(power / 10);
     baseStats.hp = Math.floor(power * 1.5);
+    // ベルトは筋力を必要とする
+    requiredStats.str = Math.floor(power / 3) + randomInt(5, 15);
   } else if (typeRoll < 0.69) {
     type = "feet";
     baseName = FEET_NAMES[randomInt(0, FEET_NAMES.length - 1)];
     baseStats.def = Math.floor(power * randomInt(5, 8) / 20) + 1;
     baseStats.dex = Math.floor(power / 12);
+    // 靴は器用さを必要とする
+    requiredStats.dex = Math.floor(power / 3) + randomInt(5, 15);
   } else if (typeRoll < 0.80) {
     type = "skill";
     const templates = SKILL_TEMPLATES.filter(s => !s.rarity || s.rarity === rarityKey);
     const template = templates.length > 0 ? templates[randomInt(0, templates.length - 1)] : SKILL_TEMPLATES[0];
     baseName = `${template.name}の巻物`;
     
-    // スキルレベル1～20をランダムに付与
-    const skillLevel = randomInt(1, 20);
+    // スキルレベルを魔法石のレベルに応じて変動
+    // stoneTierが指定されている場合は、stoneTierを基準に-2～+8の範囲でランダム
+    // stoneTierが指定されていない場合は、Lv1固定
+    const skillLevel = stoneTier !== null 
+      ? Math.max(1, Math.min(50, stoneTier + randomInt(-2, 8))) // 魔法石レベルを基準に-2～+8の範囲
+      : 1; // 魔法石がない場合はLv1固定
     
-    // レベルに応じた必要能力値（レベル×5）
-    const requiredStat = skillLevel * 5;
+    // スキルは知恵を必要とする（レベル×3）
+    requiredStats.int = skillLevel * 3;
     
     skillData = { ...template };
     skillData.level = skillLevel;
-    skillData.requiredStat = requiredStat; // 装備に必要な能力値
+    skillData.requiredStats = requiredStats; // 装備に必要な能力値（後方互換性のためrequiredStatも残す）
+    skillData.requiredStat = skillLevel * 5; // 既存のチェック処理との互換性のため
     skillData.power = template.type === 'attack' ? template.power * (1 + (skillLevel - 1) * 0.05) + (power * 0.01) : template.power + Math.floor(power/2) * skillLevel;
     
     // MPコストもレベルに応じて増加（攻撃スキルの場合）
@@ -305,6 +325,7 @@ export const generateLoot = (floor, dungeonMods = {}) => {
     inks,
     rarity: rarityKey,
     power: Math.floor(power),
+    requiredStats, // 装備に必要な能力値
     isNew: true
   };
   
@@ -328,17 +349,40 @@ export const generateMagicStone = (floor) => {
   const rarityConfig = RARITIES[rarityKey];
   const modCount = randomInt(1, rarityConfig.optCount);
   const mods = [];
+  const usedTypes = new Set(); // 使用済みのタイプを追跡
   
   const risks = STONE_MODS.filter(m => m.isRisk);
-  const rewards = STONE_MODS.filter(m => m.isReward);
+  const allRewards = STONE_MODS.filter(m => m.isReward);
 
-  mods.push({ ...risks[randomInt(0, risks.length - 1)], val: randomInt(20, 50) }); 
-
-  for(let i=0; i<modCount; i++) {
-     const pool = Math.random() > 0.5 ? risks : rewards;
-     const mod = pool[randomInt(0, pool.length - 1)];
-     if (mod.valMin) mods.push({ ...mod, val: randomInt(mod.valMin, mod.valMax) });
-     else mods.push({ ...mod }); 
+  // リスクを選ぶ（同じタイプは追加しない）
+  let attempts = 0;
+  const maxAttempts = 100; // 無限ループ防止
+  while (mods.length < modCount && attempts < maxAttempts) {
+    attempts++;
+    const availableRisks = risks.filter(m => !usedTypes.has(m.type));
+    
+    if (availableRisks.length === 0) break; // 利用可能なリスクがなくなったら終了
+    
+    const risk = availableRisks[randomInt(0, availableRisks.length - 1)];
+    const riskVal = risk.valMin ? randomInt(risk.valMin, risk.valMax) : randomInt(20, 50);
+    mods.push({ ...risk, val: riskVal });
+    usedTypes.add(risk.type);
+    
+    // リスクに対応する報酬を自動的に追加
+    const rewardTypes = RISK_REWARD_MAPPING[risk.type] || [];
+    if (rewardTypes.length > 0) {
+      // 対応する報酬からランダムに1つ選ぶ
+      const availableRewardTypes = rewardTypes.filter(rt => !usedTypes.has(rt));
+      if (availableRewardTypes.length > 0) {
+        const selectedRewardType = availableRewardTypes[randomInt(0, availableRewardTypes.length - 1)];
+        const reward = allRewards.find(r => r.type === selectedRewardType);
+        if (reward) {
+          const rewardVal = reward.valMin ? randomInt(reward.valMin, reward.valMax) : 1;
+          mods.push({ ...reward, val: rewardVal });
+          usedTypes.add(reward.type);
+        }
+      }
+    }
   }
 
   let baseFloor = 5 + randomInt(0, 5);

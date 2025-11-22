@@ -12,14 +12,14 @@ export const StatsView = ({ player, getStats }) => {
       <div className="mb-8">
         <h3 className="text-lg font-bold text-gray-300 mb-4">基本ステータス</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {['str','vit','dex'].map(k => (
+          {['str','dex','int'].map(k => (
             <div key={k} className="bg-gray-800 p-6 rounded-xl border border-gray-700 hover:bg-gray-750 transition-colors">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-gray-300 uppercase font-bold text-lg">
-                  {k === 'str' ? '筋力' : k === 'vit' ? '体力' : '幸運'}
+                  {k === 'str' ? '筋力' : k === 'dex' ? '器用さ' : '知恵'}
                 </span>
               </div>
-              <div className="text-4xl font-mono text-white">{player.stats[k]}</div>
+              <div className="text-4xl font-mono text-white">{getStats[k] || 0}</div>
             </div>
           ))}
         </div>
@@ -33,28 +33,42 @@ export const StatsView = ({ player, getStats }) => {
             <div className="text-xs text-gray-400 mb-1">攻撃力</div>
             <div className="text-3xl font-bold text-red-400">{getStats.atk}</div>
             <div className="text-xs text-gray-500 mt-1">
-              基本: {getStats.atk - (getStats.str * 2)} + 筋力×2
+              装備からの攻撃力
             </div>
           </div>
           <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
             <div className="text-xs text-gray-400 mb-1">防御力</div>
             <div className="text-3xl font-bold text-blue-400">{getStats.def}</div>
             <div className="text-xs text-gray-500 mt-1">
-              基本: {getStats.def - Math.floor(getStats.vit / 2)} + 体力÷2
+              装備からの防御力
             </div>
           </div>
           <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
             <div className="text-xs text-gray-400 mb-1">最大HP</div>
             <div className="text-3xl font-bold text-green-400">{getStats.maxHp}</div>
             <div className="text-xs text-gray-500 mt-1">
-              基本: 100 + 体力×10 + 装備
+              基本: 100 + 筋力×10 + 装備
+            </div>
+          </div>
+          <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+            <div className="text-xs text-gray-400 mb-1">回避率</div>
+            <div className="text-3xl font-bold text-cyan-400">{(getStats.evade || 0).toFixed(1)}%</div>
+            <div className="text-xs text-gray-500 mt-1">
+              器用さ×1% (最大75%)
+            </div>
+          </div>
+          <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+            <div className="text-xs text-gray-400 mb-1">最大MP</div>
+            <div className="text-3xl font-bold text-purple-400">{getStats.maxMp}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              基本: 50 + 知恵×3 + 装備
             </div>
           </div>
           <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
             <div className="text-xs text-gray-400 mb-1">会心率</div>
             <div className="text-3xl font-bold text-yellow-400">{getStats.crit.toFixed(1)}%</div>
             <div className="text-xs text-gray-500 mt-1">
-              幸運×0.5 (最大75%)
+              装備オプションのみ
             </div>
           </div>
         </div>

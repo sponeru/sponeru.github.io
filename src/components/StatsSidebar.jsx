@@ -56,11 +56,11 @@ export const StatsSidebar = ({ player, getStats, equipment, optionDisplayMode, s
             現在: {getModeLabel()}
           </div>
         </div>
-        {['str','vit','dex'].map(k => (
+        {['str','dex','int'].map(k => (
           <div key={k} className="flex justify-between items-center bg-gray-800 p-4 rounded-lg mb-2 hover:bg-gray-750 transition-colors">
-            <span className="text-gray-300 uppercase font-bold text-sm">{k === 'str' ? '筋力' : k === 'vit' ? '体力' : '幸運'}</span>
+            <span className="text-gray-300 uppercase font-bold text-sm">{k === 'str' ? '筋力' : k === 'dex' ? '器用さ' : '知恵'}</span>
             <div className="flex items-center gap-3">
-              <span className="text-2xl font-mono">{player.stats[k]}</span>
+              <span className="text-2xl font-mono">{getStats[k] || 0}</span>
             </div>
           </div>
         ))}
@@ -81,7 +81,11 @@ export const StatsSidebar = ({ player, getStats, equipment, optionDisplayMode, s
             </div>
             <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
               <span className="text-gray-400">最大MP</span>
-              <span className="text-cyan-400 font-bold">{player.maxMp || 50}</span>
+              <span className="text-cyan-400 font-bold">{getStats.maxMp || 50}</span>
+            </div>
+            <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+              <span className="text-gray-400">回避率</span>
+              <span className="text-cyan-400 font-bold">{(getStats.evade || 0).toFixed(1)}%</span>
             </div>
             <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
               <span className="text-gray-400">会心率</span>

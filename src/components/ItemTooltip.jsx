@@ -1,6 +1,6 @@
 import React from 'react';
 import { ItemIcon } from './ItemIcon';
-import { RARITIES, getElementConfig, SPECIAL_OPTIONS, BASIC_OPTIONS, EQUIPMENT_TYPE_OPTIONS } from '../constants.jsx';
+import { RARITIES, getElementConfig, SPECIAL_OPTIONS, BASIC_OPTIONS, EQUIPMENT_TYPE_OPTIONS, STAT_LABELS } from '../constants.jsx';
 
 export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false, placement = 'top', positionType = 'absolute', optionDisplayMode = 'merged', equipmentType = null }) => {
   if (!item || !isVisible) return null;
@@ -105,25 +105,34 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
       
       return (
         <div>
-          <div className="mb-2 text-sm text-gray-400">
-            Tier {item.tier} / 深度: {item.maxFloor}階層
+          <div className="mb-3 pb-2 border-b border-gray-700">
+            <div className="text-base mb-1">
+              <span className="text-gray-400">Tier: </span>
+              <span className="font-bold">{item.tier}</span>
+            </div>
+            <div className="text-base">
+              <span className="text-gray-400">深度: </span>
+              <span className="font-bold">{item.maxFloor}階層</span>
+            </div>
           </div>
           {riskMods.length > 0 && (
             <div className="mb-3">
-              <div className="text-red-400 font-bold text-sm mb-1">⚠ リスク</div>
+              <div className="text-red-400 font-bold text-base mb-2">⚠ リスク</div>
               {riskMods.map((mod, idx) => (
-                <div key={idx} className="text-red-300 text-sm mb-1">
-                  {mod.label} +{mod.val}{mod.unit || ''}
+                <div key={idx} className="flex justify-between items-center py-1 border-b border-gray-800 last:border-0">
+                  <span className="text-sm text-red-300">{mod.label}</span>
+                  <span className="text-base font-bold text-red-300">+{mod.val}{mod.unit || ''}</span>
                 </div>
               ))}
             </div>
           )}
           {rewardMods.length > 0 && (
             <div>
-              <div className="text-green-400 font-bold text-sm mb-1">✨ 報酬</div>
+              <div className="text-green-400 font-bold text-base mb-2">✨ 報酬</div>
               {rewardMods.map((mod, idx) => (
-                <div key={idx} className="text-green-300 text-sm mb-1">
-                  {mod.label} +{mod.val}{mod.unit || ''}
+                <div key={idx} className="flex justify-between items-center py-1 border-b border-gray-800 last:border-0">
+                  <span className="text-sm text-green-300">{mod.label}</span>
+                  <span className="text-base font-bold text-green-300">+{mod.val}{mod.unit || ''}</span>
                 </div>
               ))}
             </div>
@@ -137,6 +146,26 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
         <div>
           {item.skillData.level && (
             <div className="text-yellow-400 font-bold mb-2 text-base">Lv.{item.skillData.level}</div>
+          )}
+          {(item.requiredStats || item.skillData.requiredStat) && (
+            <div className="bg-red-900/30 border border-red-700 rounded-lg p-2 mb-3">
+              <div className="text-red-400 text-sm font-bold mb-1">必要能力値:</div>
+              {item.requiredStats ? (
+                <>
+                  {item.requiredStats.str && (
+                    <div className="text-xs text-gray-300">筋力: {item.requiredStats.str}</div>
+                  )}
+                  {item.requiredStats.dex && (
+                    <div className="text-xs text-gray-300">器用さ: {item.requiredStats.dex}</div>
+                  )}
+                  {item.requiredStats.int && (
+                    <div className="text-xs text-gray-300">知恵: {item.requiredStats.int}</div>
+                  )}
+                </>
+              ) : (
+                <div className="text-xs text-gray-300">合計: {item.skillData.requiredStat}</div>
+              )}
+            </div>
           )}
           <div className="text-base mb-2">
             <span className="text-gray-400">タイプ: </span>
@@ -162,6 +191,20 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
       const stats = item.baseStats || item.stats || {};
       return (
         <div>
+          {item.requiredStats && (
+            <div className="bg-red-900/30 border border-red-700 rounded-lg p-2 mb-3">
+              <div className="text-red-400 text-sm font-bold mb-1">必要能力値:</div>
+              {item.requiredStats.str && (
+                <div className="text-xs text-gray-300">筋力: {item.requiredStats.str}</div>
+              )}
+              {item.requiredStats.dex && (
+                <div className="text-xs text-gray-300">器用さ: {item.requiredStats.dex}</div>
+              )}
+              {item.requiredStats.int && (
+                <div className="text-xs text-gray-300">知恵: {item.requiredStats.int}</div>
+              )}
+            </div>
+          )}
           {Object.entries(stats).map(([k, v]) => (
             <div key={k} className="text-base mb-1">
               <span className="text-gray-400 uppercase">{k}: </span>

@@ -194,11 +194,11 @@ export default function HackSlashGame() {
 
   const getStats = useMemo(() => {
     let stats = {
-      str: player.stats.str, vit: player.stats.vit, dex: player.stats.dex,
+      str: player.stats.str, dex: player.stats.dex, int: player.stats.int || 0,
       atk: 0, def: 0, hp: 0, maxMp: 0,
       vamp: 0, goldMult: 0, expMult: 0, critDmg: 0, crit: 0,
       res_fire: 0, res_ice: 0, res_thunder: 0, res_light: 0, res_dark: 0,
-      cdSpeed: 0, dmgMult: 0, hpRegen: 0,
+      cdSpeed: 0, dmgMult: 0, hpRegen: 0, evade: 0, // evade: 回避率
       skillLevel_fire: 0, skillLevel_ice: 0, skillLevel_thunder: 0, skillLevel_light: 0, skillLevel_dark: 0,
     };
     
@@ -234,9 +234,9 @@ export default function HackSlashGame() {
       if (base.atk) stats.atk += Math.floor(base.atk * atkMult);
       if (base.def) stats.def += Math.floor(base.def * defMult);
       if (base.hp) stats.hp += Math.floor(base.hp * hpMult);
-      if (base.str) stats.str += base.str;
-      if (base.vit) stats.vit += base.vit;
-      if (base.dex) stats.dex += base.dex;
+      if (base.str) stats.str = (stats.str || 0) + base.str;
+      if (base.dex) stats.dex = (stats.dex || 0) + base.dex;
+      if (base.int) stats.int = (stats.int || 0) + base.int;
 
       if (item.options) {
         item.options.forEach(opt => {
@@ -326,9 +326,13 @@ export default function HackSlashGame() {
           const effect = levelData.effect;
           const value = levelData.value;
           
-          if (effect === 'str') stats.str += value;
-          else if (effect === 'vit') stats.vit += value;
-          else if (effect === 'dex') stats.dex += value;
+          if (effect === 'str') {
+            stats.str = (stats.str || 0) + value;
+          } else if (effect === 'dex') {
+            stats.dex = (stats.dex || 0) + value;
+          } else if (effect === 'int') {
+            stats.int = (stats.int || 0) + value;
+          }
           else if (effect === 'atk_mult') stats.atk = Math.floor(stats.atk * (1 + value));
           else if (effect === 'def_mult') stats.def = Math.floor(stats.def * (1 + value));
           else if (effect === 'hp_mult') stats.hp = Math.floor(stats.hp * (1 + value));
@@ -352,8 +356,12 @@ export default function HackSlashGame() {
           }
           else if (effect === 'all_stats') {
             stats.str = Math.floor(stats.str * (1 + value));
-            stats.vit = Math.floor(stats.vit * (1 + value));
             stats.dex = Math.floor(stats.dex * (1 + value));
+            stats.int = Math.floor((stats.int || 0) * (1 + value));
+          }
+          else if (effect === 'maxMp_mult') {
+            // 最大MPの割合上昇（後で適用）
+            stats.maxMp_mult = (stats.maxMp_mult || 0) + value;
           }
           
           // ボーナス効果
@@ -387,19 +395,26 @@ export default function HackSlashGame() {
       });
     }
 
-    const finalAtk = stats.atk + (stats.str * 2);
-    const finalDef = stats.def + Math.floor(stats.vit / 2);
-    let finalMaxHp = 100 + (stats.vit * 10) + stats.hp;
+    const finalAtk = stats.atk; // 筋力は攻撃力に影響しない
+    const finalDef = stats.def; // 能力値は防御力に直接影響しない
+    // 筋力がHPを上昇させる（筋力×10）
+    let finalMaxHp = 100 + (stats.str * 10) + stats.hp;
     // グローバルHP上昇(割合)を適用
     if (globalHpMult > 0) {
       finalMaxHp = Math.floor(finalMaxHp * (1 + globalHpMult));
     }
-    const finalCrit = Math.min(75, stats.dex * 0.5 + stats.crit);
+    const finalCrit = Math.min(75, stats.crit); // 器用さは会心率に影響しない
+    // 器用さが回避率を上げる（器用さ×1%、最大75%）
+    const finalEvade = Math.min(75, stats.dex * 1 + stats.evade);
     
-    // 最大MPの計算（グローバル上昇を含む）
-    let finalMaxMp = 50 + ((player.level - 1) * 5) + stats.maxMp;
+    // 知恵が最大MPを増加させる（知恵×3）
+    let finalMaxMp = 50 + ((player.level - 1) * 5) + ((stats.int || 0) * 3) + stats.maxMp;
     if (globalMaxMpMult > 0) {
       finalMaxMp = Math.floor(finalMaxMp * (1 + globalMaxMpMult));
+    }
+    // スキルからの最大MP割合上昇を適用
+    if (stats.maxMp_mult) {
+      finalMaxMp = Math.floor(finalMaxMp * (1 + stats.maxMp_mult));
     }
 
     return { 
@@ -407,10 +422,11 @@ export default function HackSlashGame() {
       def: finalDef, 
       maxHp: finalMaxHp, 
       maxMp: finalMaxMp,
-      crit: finalCrit, 
+      crit: finalCrit,
+      evade: finalEvade,
       ...stats 
     };
-  }, [player.stats, equipment, player.buffs, player.learnedSkills]);
+  }, [player.stats, equipment, player.buffs, player.learnedSkills, player.level]);
 
   // --- Dungeon Logic ---
 
@@ -420,8 +436,10 @@ export default function HackSlashGame() {
     let mods = {};
     let stoneName = "始まりの平原";
 
+    let stoneTier = floor; // 魔法石がない場合はfloorを使用
     if (stone) {
         floor = stone.tier; 
+        stoneTier = stone.tier;
         maxFloor = stone.maxFloor;
         stoneName = stone.name;
         stone.mods.forEach(m => {
@@ -430,7 +448,7 @@ export default function HackSlashGame() {
         setStones(prev => prev.filter(s => s.id !== stone.id));
     }
 
-    setActiveDungeon({ floor, startFloor: floor, maxFloor, mods, stoneName });
+    setActiveDungeon({ floor, startFloor: floor, maxFloor, mods, stoneName, stoneTier });
     setEnemy(generateEnemy(floor, mods, floor === maxFloor));
     setPhase('dungeon');
     setTab('battle');
@@ -743,7 +761,8 @@ export default function HackSlashGame() {
               const hasWarehouseSpace = warehouse.length < MAX_WAREHOUSE;
               
               if (hasInventorySpace || hasWarehouseSpace) {
-                  const loot = generateLoot(floor, dMods);
+                  const stoneTier = activeDungeon?.stoneTier || floor;
+                  const loot = generateLoot(floor, dMods, stoneTier);
                   if (hasInventorySpace) {
                       setInventory(prev => addEquipmentItemToStack(prev, loot));
                   } else {
@@ -821,15 +840,87 @@ export default function HackSlashGame() {
     addLog(`${skill.name} を習得しました`, 'green');
   };
   
-  const equipItem = (item, slotIndex = null) => { 
-    // 巻物の場合、必要能力値をチェック
-    if (item.type === 'skill' && item.skillData && item.skillData.requiredStat) {
-      const requiredStat = item.skillData.requiredStat;
-      const totalStats = getStats.str + getStats.vit + getStats.dex;
-      if (totalStats < requiredStat) {
-        addLog(`装備できません。必要能力値: ${requiredStat}（現在: ${totalStats}）`, 'red');
-        return;
+  // 装備可能かチェックする関数
+  const canEquipItem = (item, currentEquipment = equipment) => {
+    // 装備に必要な能力値をチェック
+    if (item.requiredStats) {
+      // 基本能力値（スキルツリーの効果を含む）
+      let playerStats = {
+        str: player.stats.str,
+        dex: player.stats.dex,
+        int: player.stats.int || 0
+      };
+      
+      // スキルツリーの効果を適用
+      if (player.learnedSkills) {
+        SKILL_TREE.forEach(skill => {
+          const level = player.learnedSkills[skill.id] || 0;
+          if (level > 0 && skill.levelData) {
+            const levelData = skill.levelData;
+            const effect = levelData.effect;
+            const value = levelData.value;
+            
+            if (effect === 'str') {
+              playerStats.str = (playerStats.str || 0) + value;
+            } else if (effect === 'dex') {
+              playerStats.dex = (playerStats.dex || 0) + value;
+            } else if (effect === 'int') {
+              playerStats.int = (playerStats.int || 0) + value;
+            }
+          }
+        });
       }
+      
+      // 装備品からの能力値ボーナスを考慮
+      Object.values(currentEquipment).forEach(eq => {
+        if (!eq) return;
+        const base = eq.baseStats || {};
+        if (base.str) playerStats.str += base.str;
+        if (base.dex) playerStats.dex += base.dex;
+        if (base.int) playerStats.int += base.int;
+      });
+      
+      // 能力値ボーナスを装備しようとしているアイテムからも考慮（自分自身は除外）
+      const tempStats = { ...playerStats };
+      const base = item.baseStats || {};
+      if (base.str) tempStats.str += base.str;
+      if (base.dex) tempStats.dex += base.dex;
+      if (base.int) tempStats.int += base.int;
+      
+      let missingStats = [];
+      if (item.requiredStats.str && tempStats.str < item.requiredStats.str) {
+        missingStats.push(`筋力: ${item.requiredStats.str}（現在: ${tempStats.str}）`);
+      }
+      if (item.requiredStats.dex && tempStats.dex < item.requiredStats.dex) {
+        missingStats.push(`器用さ: ${item.requiredStats.dex}（現在: ${tempStats.dex}）`);
+      }
+      if (item.requiredStats.int && tempStats.int < item.requiredStats.int) {
+        missingStats.push(`知恵: ${item.requiredStats.int}（現在: ${tempStats.int}）`);
+      }
+      
+      if (missingStats.length > 0) {
+        return { canEquip: false, message: `装備できません。必要能力値: ${missingStats.join(', ')}` };
+      }
+    }
+    
+    // 後方互換性: 巻物の旧方式の必要能力値チェック
+    if (item.type === 'skill' && item.skillData && item.skillData.requiredStat && !item.requiredStats) {
+      const requiredStat = item.skillData.requiredStat;
+      const totalStats = getStats.str + getStats.dex + getStats.int;
+      if (totalStats < requiredStat) {
+        return { canEquip: false, message: `装備できません。必要能力値: ${requiredStat}（現在: ${totalStats}）` };
+      }
+    }
+    
+    return { canEquip: true };
+  };
+  
+  const equipItem = (item, slotIndex = null) => { 
+    // 装備可能かチェック
+    const checkResult = canEquipItem(item);
+    if (!checkResult.canEquip) {
+      addLog(checkResult.message, 'red');
+      return;
     }
     
     let slot = item.type;
@@ -1033,6 +1124,15 @@ export default function HackSlashGame() {
       
       if (slot === 'skill1' || slot === 'skill2' || slot === 'skill3') {
         if (item.type === 'skill') {
+          // 必要能力値をチェック
+          const checkResult = canEquipItem(item);
+          if (!checkResult.canEquip) {
+            addLog(checkResult.message, 'red');
+            setDraggedItem(null);
+            setDragOverTarget(null);
+            return;
+          }
+          
           canEquip = true;
           const slotNum = parseInt(slot.replace('skill', ''));
           
@@ -1077,6 +1177,15 @@ export default function HackSlashGame() {
       } else if (EQUIPMENT_SLOTS.includes(slot)) {
         const expectedType = getSlotType(slot);
         if (item.type === expectedType) {
+          // 必要能力値をチェック
+          const checkResult = canEquipItem(item);
+          if (!checkResult.canEquip) {
+            addLog(checkResult.message, 'red');
+            setDraggedItem(null);
+            setDragOverTarget(null);
+            return;
+          }
+          
           canEquip = true;
           
           // 倉庫からの場合はインベントリに移動

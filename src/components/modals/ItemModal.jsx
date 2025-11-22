@@ -131,12 +131,42 @@ export const ItemModal = ({
               {selectedItem.skillData.level && (
                 <div className="text-yellow-400 text-lg font-bold mb-3">Lv.{selectedItem.skillData.level}</div>
               )}
-              {selectedItem.skillData.requiredStat && (
+              {(selectedItem.requiredStats || selectedItem.skillData?.requiredStat) && (
                 <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4">
-                  <div className="text-red-400 text-sm font-bold mb-1">必要能力値: {selectedItem.skillData.requiredStat}</div>
-                  <div className="text-xs text-gray-400">現在: {getStats.str + getStats.vit + getStats.dex}</div>
-                  {(getStats.str + getStats.vit + getStats.dex) < selectedItem.skillData.requiredStat && (
-                    <div className="text-red-500 text-xs mt-1">※装備できません</div>
+                  <div className="text-red-400 text-sm font-bold mb-2">必要能力値:</div>
+                  {selectedItem.requiredStats ? (
+                    <>
+                      {selectedItem.requiredStats.str && (
+                        <div className="text-xs text-gray-400 mb-1">
+                          筋力: {selectedItem.requiredStats.str} (現在: {getStats.str})
+                          {getStats.str < selectedItem.requiredStats.str && <span className="text-red-500 ml-2">※不足</span>}
+                        </div>
+                      )}
+                      {selectedItem.requiredStats.dex && (
+                        <div className="text-xs text-gray-400 mb-1">
+                          器用さ: {selectedItem.requiredStats.dex} (現在: {getStats.dex})
+                          {getStats.dex < selectedItem.requiredStats.dex && <span className="text-red-500 ml-2">※不足</span>}
+                        </div>
+                      )}
+                      {selectedItem.requiredStats.int && (
+                        <div className="text-xs text-gray-400 mb-1">
+                          知恵: {selectedItem.requiredStats.int} (現在: {getStats.int || 0})
+                          {(getStats.int || 0) < selectedItem.requiredStats.int && <span className="text-red-500 ml-2">※不足</span>}
+                        </div>
+                      )}
+                      {(selectedItem.requiredStats.str && getStats.str < selectedItem.requiredStats.str) ||
+                       (selectedItem.requiredStats.dex && getStats.dex < selectedItem.requiredStats.dex) ||
+                       (selectedItem.requiredStats.int && (getStats.int || 0) < selectedItem.requiredStats.int) ? (
+                        <div className="text-red-500 text-xs mt-2">※装備できません</div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-xs text-gray-400 mb-1">合計: {selectedItem.skillData.requiredStat} (現在: {getStats.str + getStats.dex + (getStats.int || 0)})</div>
+                      {(getStats.str + getStats.dex + (getStats.int || 0)) < selectedItem.skillData.requiredStat && (
+                        <div className="text-red-500 text-xs mt-1">※装備できません</div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
