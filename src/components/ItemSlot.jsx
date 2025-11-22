@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
 import { ItemIcon } from './ItemIcon';
 import { RARITIES } from '../constants.jsx';
+import { ItemTooltip } from './ItemTooltip';
 
 export const ItemSlot = React.memo(({ 
   item, 
@@ -17,6 +18,7 @@ export const ItemSlot = React.memo(({
   dragSource = null,
 }) => {
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [tooltipPlacement, setTooltipPlacement] = useState('top');
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipTimeoutRef = useRef(null);
 
@@ -56,9 +58,46 @@ export const ItemSlot = React.memo(({
   const handleMouseEnter = (e) => {
     if (!item) return;
     const rect = e.currentTarget.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // ツールチップの推定サイズ
+    const tooltipWidth = 400;
+    const tooltipHeight = 300;
+    
+    const nodeCenterX = rect.left + rect.width / 2;
+    const nodeCenterY = rect.top + rect.height / 2;
+    
+    // 画面端からの距離を計算
+    const spaceTop = nodeCenterY;
+    const spaceBottom = viewportHeight - nodeCenterY;
+    const spaceLeft = nodeCenterX;
+    const spaceRight = viewportWidth - nodeCenterX;
+    
+    // 最適な配置を決定
+    let placement = 'top';
+    if (spaceTop < tooltipHeight && spaceBottom > tooltipHeight) {
+      placement = 'bottom';
+    } else if (spaceTop < tooltipHeight && spaceBottom < tooltipHeight) {
+      // 上下にスペースがない場合は横に表示
+      if (spaceRight > tooltipWidth) {
+        placement = 'right';
+      } else if (spaceLeft > tooltipWidth) {
+        placement = 'left';
+      } else {
+        // 右側に少しでもスペースがあれば右に、なければ左に
+        placement = spaceRight > spaceLeft ? 'right' : 'left';
+      }
+    } else if (spaceRight < tooltipWidth && spaceLeft > tooltipWidth) {
+      placement = 'left';
+    } else if (spaceLeft < tooltipWidth && spaceRight > tooltipWidth) {
+      placement = 'right';
+    }
+    
+    setTooltipPlacement(placement);
     setTooltipPosition({
-      x: rect.left + rect.width / 2,
-      y: rect.top,
+      x: nodeCenterX,
+      y: nodeCenterY,
     });
     tooltipTimeoutRef.current = setTimeout(() => {
       setShowTooltip(true);
@@ -76,9 +115,46 @@ export const ItemSlot = React.memo(({
   const handleMouseMove = (e) => {
     if (!item || !showTooltip) return;
     const rect = e.currentTarget.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // ツールチップの推定サイズ
+    const tooltipWidth = 400;
+    const tooltipHeight = 300;
+    
+    const nodeCenterX = rect.left + rect.width / 2;
+    const nodeCenterY = rect.top + rect.height / 2;
+    
+    // 画面端からの距離を計算
+    const spaceTop = nodeCenterY;
+    const spaceBottom = viewportHeight - nodeCenterY;
+    const spaceLeft = nodeCenterX;
+    const spaceRight = viewportWidth - nodeCenterX;
+    
+    // 最適な配置を決定
+    let placement = 'top';
+    if (spaceTop < tooltipHeight && spaceBottom > tooltipHeight) {
+      placement = 'bottom';
+    } else if (spaceTop < tooltipHeight && spaceBottom < tooltipHeight) {
+      // 上下にスペースがない場合は横に表示
+      if (spaceRight > tooltipWidth) {
+        placement = 'right';
+      } else if (spaceLeft > tooltipWidth) {
+        placement = 'left';
+      } else {
+        // 右側に少しでもスペースがあれば右に、なければ左に
+        placement = spaceRight > spaceLeft ? 'right' : 'left';
+      }
+    } else if (spaceRight < tooltipWidth && spaceLeft > tooltipWidth) {
+      placement = 'left';
+    } else if (spaceLeft < tooltipWidth && spaceRight > tooltipWidth) {
+      placement = 'right';
+    }
+    
+    setTooltipPlacement(placement);
     setTooltipPosition({
-      x: rect.left + rect.width / 2,
-      y: rect.top,
+      x: nodeCenterX,
+      y: nodeCenterY,
     });
   };
 
@@ -136,90 +212,13 @@ export const ItemSlot = React.memo(({
           )}
       </button>
       {showTooltip && (
-        <div
-          className="fixed z-[9999] pointer-events-none bg-gray-900 border-2 border-gray-700 rounded-lg p-3 shadow-2xl min-w-[270px] max-w-[375px]"
-          style={{
-            left: `${tooltipPosition.x}px`,
-            top: `${tooltipPosition.y}px`,
-            transform: 'translate(-50%, -100%) translateY(-8px)',
-          }}
-        >
-          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-700">
-            <div className={`w-9 h-9 rounded flex items-center justify-center border ${rarity.bg} ${rarity.border}`}>
-              <div className={rarity.color}>
-                <ItemIcon item={item} size={24} />
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className={`text-xs font-bold uppercase ${rarity.color} truncate`}>
-                {rarity.label}
-              </div>
-              <div className="text-sm font-bold truncate">{item.name || '無名のアイテム'}</div>
-            </div>
-          </div>
-          <div className="text-sm space-y-1">
-            {item.type === 'ink' && (
-              <div className="text-purple-300">
-                <div>効果: {item.mod.label} {item.mod.val > 0 ? '+' : ''}{item.mod.val}{item.mod.unit || ''}</div>
-                {item.mod.penalty && (
-                  <div className="text-red-400 text-xs mt-1">
-                    デメリット: {item.mod.penalty.type === 'power_down' ? '威力低下' : 'CD増加'} {item.mod.penalty.val * 100}%
-                  </div>
-                )}
-              </div>
-            )}
-            {item.type === 'enhancement_stone' && (
-              <div className="text-yellow-300">
-                <div>基本ステータス +{(item.mult * 100).toFixed(0)}%</div>
-              </div>
-            )}
-            {item.type === 'enchant_scroll' && (
-              <div className="text-blue-300">
-                <div>オプション +1</div>
-              </div>
-            )}
-            {item.baseStats && Object.entries(item.baseStats).map(([k, v]) => (
-              <div key={k} className="text-sm">
-                <span className="text-gray-400 uppercase">{k}: </span>
-                <span className="font-bold">{v}</span>
-              </div>
-            ))}
-            {item.skillData && (
-              <>
-                {item.skillData.level && (
-                  <div className="text-yellow-400 font-bold">Lv.{item.skillData.level}</div>
-                )}
-                <div className="text-sm">
-                  <span className="text-gray-400">タイプ: </span>
-                  <span className="font-bold">{item.skillData.type === 'buff' ? 'BUFF' : item.skillData.type === 'heal' ? 'HEAL' : 'ATTACK'}</span>
-                </div>
-                {item.skillData.power !== undefined && (
-                  <div className="text-sm">
-                    <span className="text-gray-400">威力: </span>
-                    <span className="font-bold">x{typeof item.skillData.power === 'number' ? item.skillData.power.toFixed(1) : item.skillData.power}</span>
-                  </div>
-                )}
-                {item.skillData.cd !== undefined && (
-                  <div className="text-sm">
-                    <span className="text-gray-400">CD: </span>
-                    <span className="font-bold">{item.skillData.cd}s</span>
-                  </div>
-                )}
-              </>
-            )}
-            {item.options && item.options.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-gray-700">
-                <div className="text-sm text-gray-500 mb-1 font-bold">オプション:</div>
-                {item.options.map((opt, idx) => (
-                  <div key={idx} className={`text-sm ${opt.isSpecial ? 'text-yellow-400' : 'text-gray-300'}`}>
-                    {opt.isSpecial && <span className="text-yellow-400">★ </span>}
-                    {opt.label} +{opt.val}{opt.unit || ''}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <ItemTooltip
+          item={item}
+          position={tooltipPosition}
+          isVisible={showTooltip}
+          placement={tooltipPlacement}
+          positionType="fixed"
+        />
       )}
       </>
   );

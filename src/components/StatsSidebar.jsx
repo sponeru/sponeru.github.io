@@ -3,7 +3,7 @@ import { Trophy } from 'lucide-react';
 import { ItemSlot } from './ItemSlot';
 import { EQUIPMENT_SLOTS, getSlotLabel } from '../utils/gameUtils';
 
-export const StatsSidebar = ({ player, getStats, equipment, onItemClick }) => {
+export const StatsSidebar = ({ player, getStats, equipment }) => {
   return (
     <aside className="w-80 bg-gray-900 border-r border-gray-800 overflow-y-auto flex-shrink-0">
       <div className="p-6">
@@ -122,7 +122,7 @@ export const StatsSidebar = ({ player, getStats, equipment, onItemClick }) => {
                 <div className="w-16 h-16 flex-shrink-0">
                   <ItemSlot 
                     item={equipment[slot]} 
-                    onClick={() => equipment[slot] && onItemClick({...equipment[slot], isEquipped: true})} 
+                    onClick={() => {}} 
                     isEquipped={true} 
                     iconSize={32} 
                   />
@@ -144,7 +144,7 @@ export const StatsSidebar = ({ player, getStats, equipment, onItemClick }) => {
                   <div className="w-14 h-14 flex-shrink-0">
                     <ItemSlot 
                       item={equipment[`skill${num}`]} 
-                      onClick={() => onItemClick({...equipment[`skill${num}`], isEquipped: true})} 
+                      onClick={() => {}} 
                       isEquipped={true} 
                       iconSize={28} 
                     />

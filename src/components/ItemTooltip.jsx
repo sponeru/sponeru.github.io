@@ -2,10 +2,25 @@ import React from 'react';
 import { ItemIcon } from './ItemIcon';
 import { RARITIES, getElementConfig, SPECIAL_OPTIONS } from '../constants.jsx';
 
-export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false }) => {
+export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false, placement = 'top', positionType = 'absolute' }) => {
   if (!item || !isVisible) return null;
 
   const rarity = RARITIES[item.rarity] || RARITIES.common;
+
+  // 配置に応じたtransformスタイルを計算
+  const getTransformStyle = () => {
+    switch (placement) {
+      case 'bottom':
+        return 'translate(-50%, 0) translateY(8px)';
+      case 'right':
+        return 'translate(0, -50%) translateX(8px)';
+      case 'left':
+        return 'translate(-100%, -50%) translateX(-8px)';
+      case 'top':
+      default:
+        return 'translate(-50%, -100%) translateY(-8px)';
+    }
+  };
 
   const getTooltipContent = () => {
     if (item.type === 'ink') {
@@ -84,6 +99,39 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
       );
     }
 
+    if (item.type === 'stone' && item.mods) {
+      const riskMods = item.mods.filter(m => m.isRisk);
+      const rewardMods = item.mods.filter(m => m.isReward);
+      
+      return (
+        <div>
+          <div className="mb-2 text-sm text-gray-400">
+            Tier {item.tier} / 深度: {item.maxFloor}階層
+          </div>
+          {riskMods.length > 0 && (
+            <div className="mb-3">
+              <div className="text-red-400 font-bold text-sm mb-1">⚠ リスク</div>
+              {riskMods.map((mod, idx) => (
+                <div key={idx} className="text-red-300 text-sm mb-1">
+                  {mod.label} +{mod.val}{mod.unit || ''}
+                </div>
+              ))}
+            </div>
+          )}
+          {rewardMods.length > 0 && (
+            <div>
+              <div className="text-green-400 font-bold text-sm mb-1">✨ 報酬</div>
+              {rewardMods.map((mod, idx) => (
+                <div key={idx} className="text-green-300 text-sm mb-1">
+                  {mod.label} +{mod.val}{mod.unit || ''}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (item.type === 'skill' && item.skillData) {
       return (
         <div>
@@ -140,11 +188,11 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
 
   return (
     <div
-      className="absolute z-[9999] pointer-events-none bg-gray-900 border-2 border-gray-700 rounded-lg p-[18px] shadow-2xl min-w-[300px] max-w-[450px]"
+      className={`${positionType === 'fixed' ? 'fixed' : 'absolute'} z-[9999] pointer-events-none bg-gray-900 border-2 border-gray-700 rounded-lg p-[18px] shadow-2xl min-w-[300px] max-w-[450px]`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
-        transform: 'translate(-50%, -100%) translateY(-8px)',
+        transform: getTransformStyle(),
       }}
     >
       <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-700">
