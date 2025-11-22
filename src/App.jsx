@@ -1,391 +1,32 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Sword, Shield, Zap, Heart, Skull, Coins, ShoppingBag, 
-  RefreshCw, Star, Trophy, Trash2, Backpack, Gem, X, Hammer, Sparkles,
-  Map as MapIcon, ArrowRight, LogOut, Flame, Flag, Scroll, Snowflake, Sun, Moon, Wind, 
-  Droplet, PlayCircle, Layers, Clock, ChevronsUp, AlertTriangle
+  Heart, Coins, Trophy, Backpack, Sword, Map as MapIcon, 
+  ArrowRight, LogOut, Flame, ChevronsUp, Sparkles
 } from 'lucide-react';
 
-// ==========================================
-// Section 1: Constants & Data Definitions
-// ==========================================
+import {
+  INITIAL_PLAYER,
+  INITIAL_EQUIPMENT,
+  MAX_INVENTORY,
+  MAX_STONES,
+  RARITIES,
+  RARITY_ORDER,
+  getElementConfig,
+  BASIC_OPTIONS,
+  SPECIAL_OPTIONS,
+} from './constants.jsx';
 
-const INITIAL_PLAYER = {
-  level: 1,
-  exp: 0,
-  expToNext: 50,
-  gold: 0,
-  hp: 100,
-  maxHp: 100,
-  stats: { str: 5, vit: 5, dex: 5 },
-  statPoints: 0,
-  buffs: [], // Active buffs
-};
+import {
+  generateEnemy,
+  generateLoot,
+  generateMagicStone,
+  generateOptions,
+} from './utils/gameLogic';
 
-const INITIAL_EQUIPMENT = {
-  weapon: { id: 'init_w', name: "木の棒", type: "weapon", baseStats: { atk: 2 }, options: [], rarity: "common", power: 1 },
-  armor: { id: 'init_a', name: "ボロボロの服", type: "armor", baseStats: { def: 1 }, options: [], rarity: "common", power: 1 },
-  accessory: null,
-  skill1: null, 
-  skill2: null,
-  skill3: null,
-};
-
-const MAX_INVENTORY = 25;
-const MAX_STONES = 10;
-const ELEMENTS = ['fire', 'ice', 'thunder', 'light', 'dark'];
-
-const ELEMENT_CONFIG = {
-  fire: { label: '火', icon: <Flame size={18} />, color: 'text-red-500', bg: 'bg-red-900/30' },
-  ice: { label: '氷', icon: <Snowflake size={18} />, color: 'text-cyan-400', bg: 'bg-cyan-900/30' },
-  thunder: { label: '雷', icon: <Zap size={18} />, color: 'text-yellow-400', bg: 'bg-yellow-900/30' },
-  light: { label: '光', icon: <Sun size={18} />, color: 'text-orange-300', bg: 'bg-orange-900/30' },
-  dark: { label: '闇', icon: <Moon size={18} />, color: 'text-purple-400', bg: 'bg-purple-900/30' },
-  none: { label: '無', icon: <Sword size={18} />, color: 'text-gray-400', bg: 'bg-gray-800' }
-};
-
-const RARITIES = {
-  common: { color: "text-gray-400", border: "border-gray-600", bg: "bg-gray-800", label: "コモン", mult: 1, optCount: 0, inkSlots: 1 },
-  uncommon: { color: "text-green-400", border: "border-green-600", bg: "bg-green-900/30", label: "アンコモン", mult: 1.5, optCount: 2, inkSlots: 2 },
-  rare: { color: "text-blue-400", border: "border-blue-600", bg: "bg-blue-900/30", label: "レア", mult: 2.5, optCount: 3, inkSlots: 3 },
-  epic: { color: "text-purple-400", border: "border-purple-600", bg: "bg-purple-900/30", label: "エピック", mult: 4, optCount: 4, inkSlots: 4 },
-  legendary: { color: "text-yellow-400", border: "border-yellow-600", bg: "bg-yellow-900/30", label: "レジェンダリー", mult: 7, optCount: 5, inkSlots: 5 },
-};
-
-const SKILL_TEMPLATES = [
-  // Attacks
-  { name: "ファイアボール", type: 'attack', element: 'fire', power: 2.5, cd: 3 },
-  { name: "アイスニードル", type: 'attack', element: 'ice', power: 2.2, cd: 3 },
-  { name: "サンダーボルト", type: 'attack', element: 'thunder', power: 2.8, cd: 4 },
-  { name: "ホーリーレイ", type: 'attack', element: 'light', power: 3.0, cd: 5 },
-  { name: "ダークマター", type: 'attack', element: 'dark', power: 3.5, cd: 6 },
-  { name: "メテオストライク", type: 'attack', element: 'fire', power: 5.0, cd: 10, rarity: 'legendary' },
-  // Buffs
-  { name: "ヒールライト", type: 'heal', element: 'light', power: 50, cd: 10, label: "HP回復" },
-  { name: "バーサーク", type: 'buff', element: 'fire', buffType: 'atk', val: 0.5, duration: 10, cd: 20, label: "攻撃UP" },
-  { name: "アイアンガード", type: 'buff', element: 'none', buffType: 'def', val: 20, duration: 15, cd: 20, label: "防御UP" },
-  { name: "クイックステップ", type: 'buff', element: 'thunder', buffType: 'cdSpeed', val: 0.5, duration: 10, cd: 25, label: "CD加速" },
-];
-
-const INK_MODS = [
-  { type: 'power_up', label: '威力強化', stat: 'power', val: 0.2, unit: 'x' },
-  { type: 'cd_down', label: 'CD短縮', stat: 'cd', val: -0.15, unit: '%' },
-  { type: 'dur_up', label: '時間延長', stat: 'duration', val: 0.3, unit: '%' },
-];
-
-const INK_RARE_MODS = [
-  { type: 'auto_cast', label: '自動発動', isRare: true, penalty: { type: 'power_down', val: -0.3 } },
-  { type: 'multi_cast', label: '2回発動', isRare: true, val: 1, penalty: { type: 'cd_up', val: 0.5 } },
-];
-
-// Item Options
-const BASIC_OPTIONS = [
-  { type: 'str', label: '筋力', weight: 10 },
-  { type: 'vit', label: '体力', weight: 10 },
-  { type: 'dex', label: '幸運', weight: 10 },
-  { type: 'atk', label: '攻撃力', weight: 5 },
-  { type: 'def', label: '防御力', weight: 5 },
-  { type: 'maxHp', label: '最大HP', weight: 8 },
-  { type: 'res_fire', label: '火耐性', unit: '%', weight: 5, isRes: true },
-  { type: 'res_ice', label: '氷耐性', unit: '%', weight: 5, isRes: true },
-  { type: 'res_thunder', label: '雷耐性', unit: '%', weight: 5, isRes: true },
-  { type: 'res_light', label: '光耐性', unit: '%', weight: 5, isRes: true },
-  { type: 'res_dark', label: '闇耐性', unit: '%', weight: 5, isRes: true },
-];
-
-const SPECIAL_OPTIONS = [
-  { type: 'vamp', label: 'HP吸収', unit: '%', min: 1, max: 5 },
-  { type: 'gold', label: 'G獲得', unit: '%', min: 10, max: 50 },
-  { type: 'exp', label: 'EXP獲得', unit: '%', min: 10, max: 50 },
-  { type: 'critDmg', label: '会心ダメ', unit: '%', min: 20, max: 100 },
-];
-
-const STONE_MODS = [
-  { type: 'risk_hp', label: '敵HP', valMin: 20, valMax: 100, unit: '%', isRisk: true },
-  { type: 'risk_atk', label: '敵攻撃力', valMin: 20, valMax: 80, unit: '%', isRisk: true },
-  { type: 'risk_dmg', label: '被ダメ', valMin: 10, valMax: 50, unit: '%', isRisk: true },
-  { type: 'reward_exp', label: '獲得EXP', valMin: 20, valMax: 100, unit: '%', isReward: true },
-  { type: 'reward_gold', label: '獲得Gold', valMin: 20, valMax: 100, unit: '%', isReward: true },
-  { type: 'reward_drop', label: '装備数', valMin: 1, valMax: 3, unit: '個増', isReward: true },
-  { type: 'qual_rarity', label: 'レア度', valMin: 10, valMax: 50, unit: '%向上', isReward: true },
-  { type: 'mod_floor_add', label: '階層', valMin: 1, valMax: 5, unit: '階増', isRisk: true }, 
-  { type: 'mod_floor_sub', label: '階層', valMin: 1, valMax: 3, unit: '階減', isReward: true }, 
-];
-
-const MONSTER_NAMES = [
-  { name: "スライム", icon: "💧", baseHp: 20, baseExp: 10, baseGold: 2 },
-  { name: "コウモリ", icon: "🦇", baseHp: 35, baseExp: 15, baseGold: 5 },
-  { name: "ゴブリン", icon: "👺", baseHp: 60, baseExp: 25, baseGold: 10 },
-  { name: "スケルトン", icon: "💀", baseHp: 90, baseExp: 40, baseGold: 15 },
-  { name: "オーク", icon: "👹", baseHp: 150, baseExp: 70, baseGold: 30 },
-  { name: "ゴーレム", icon: "🗿", baseHp: 300, baseExp: 120, baseGold: 60 },
-  { name: "ドラゴン", icon: "🐉", baseHp: 1000, baseExp: 500, baseGold: 300 },
-];
-
-const ITEM_PREFIXES = ["錆びた", "普通の", "鋭い", "重厚な", "疾風の", "達人の", "勇者の", "魔王の", "神々の"];
-const WEAPON_NAMES = ["ダガー", "ソード", "アックス", "メイス", "カタナ", "グレートソード"];
-const ARMOR_NAMES = ["ローブ", "レザー", "メイル", "プレート", "フルプレート"];
-const ACC_NAMES = ["リング", "アミュレット", "タリスマン", "オーブ"];
-
-// ==========================================
-// Section 2: Game Logic Helpers
-// ==========================================
-
-const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-const generateEnemy = (floor, dungeonMods = {}, isFinalBoss = false) => {
-  const scaling = Math.pow(1.15, floor - 1);
-  const typeIndex = Math.min(Math.floor((floor - 1) / 5), MONSTER_NAMES.length - 1);
-  const type = MONSTER_NAMES[typeIndex];
-  
-  const isBoss = isFinalBoss || (floor % 10 === 0);
-  const finalScaling = isBoss ? scaling * 3 : scaling;
-
-  const hpMod = 1 + ((dungeonMods.risk_hp || 0) / 100);
-  const atkMod = 1 + ((dungeonMods.risk_atk || 0) / 100);
-  
-  let element = 'none';
-  if (isBoss || Math.random() < 0.4) {
-      element = ELEMENTS[randomInt(0, ELEMENTS.length - 1)];
-  }
-
-  return {
-    name: isBoss ? `BOSS: ${type.name}ロード` : type.name,
-    icon: isBoss ? "👑" : type.icon,
-    maxHp: Math.floor(type.baseHp * finalScaling * hpMod),
-    hp: Math.floor(type.baseHp * finalScaling * hpMod),
-    atk: Math.floor((floor * 2 + 5) * (isBoss ? 1.5 : 1) * atkMod),
-    exp: Math.floor(type.baseExp * scaling), 
-    gold: Math.floor(type.baseGold * scaling),
-    element,
-    isBoss,
-    wait: 0,
-    maxWait: Math.max(20, 100 - floor), 
-  };
-};
-
-const generateOptions = (rarityKey, power, dungeonMods = {}) => {
-  const options = [];
-  const config = RARITIES[rarityKey];
-  let pool = [...BASIC_OPTIONS];
-  let specialPool = [...SPECIAL_OPTIONS];
-
-  for (let i = 0; i < config.optCount; i++) {
-    const optType = pool[randomInt(0, pool.length - 1)];
-    let val = Math.max(1, Math.floor(power * (randomInt(5, 15) / 100)));
-    
-    if (optType.type === 'maxHp') val *= 5;
-    if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
-    if (optType.isRes) val = randomInt(5, 20); 
-
-    options.push({ ...optType, val, isSpecial: false });
-  }
-
-  if (rarityKey === 'legendary') {
-    const special = specialPool[randomInt(0, specialPool.length - 1)];
-    const val = randomInt(special.min, special.max);
-    options.push({ ...special, val, isSpecial: true });
-  }
-  return options;
-};
-
-const generateInk = (floor) => {
-  const rarityRoll = Math.random();
-  let rarityKey = 'common';
-  if (rarityRoll > 0.9) rarityKey = 'rare'; // High rarity ink has powerful effects
-  
-  const isRareMod = rarityKey === 'rare' || Math.random() > 0.8;
-  let modTemplate;
-  
-  if (isRareMod) {
-      modTemplate = INK_RARE_MODS[randomInt(0, INK_RARE_MODS.length - 1)];
-      rarityKey = 'rare';
-  } else {
-      modTemplate = INK_MODS[randomInt(0, INK_MODS.length - 1)];
-  }
-  
-  return {
-      id: Date.now() + Math.random(),
-      type: 'ink',
-      name: `${modTemplate.label}インク`,
-      mod: { ...modTemplate },
-      rarity: rarityKey,
-      isNew: true
-  };
-};
-
-const generateLoot = (floor, dungeonMods = {}) => {
-  const rand = Math.random();
-  const rarityBoost = (dungeonMods.qual_rarity || 0) / 100;
-  
-  let rarityKey = "common";
-  if (rand > (0.98 - rarityBoost * 0.1)) rarityKey = "legendary";
-  else if (rand > (0.90 - rarityBoost * 0.2)) rarityKey = "epic";
-  else if (rand > (0.75 - rarityBoost * 0.3)) rarityKey = "rare";
-  else if (rand > (0.50 - rarityBoost * 0.3)) rarityKey = "uncommon";
-
-  const rarity = RARITIES[rarityKey];
-  
-  const typeRoll = Math.random();
-  let type = "weapon";
-  let baseName = "";
-  let baseStats = {};
-  let skillData = null;
-  let inks = [];
-  let inkSlots = 0;
-
-  const tierMult = floor * 1.5;
-  const power = tierMult * rarity.mult;
-
-  if (typeRoll < 0.3) {
-    type = "weapon";
-    baseName = WEAPON_NAMES[randomInt(0, WEAPON_NAMES.length - 1)];
-    baseStats.atk = Math.floor(power * randomInt(8, 12) / 10) + 1;
-  } else if (typeRoll < 0.55) {
-    type = "armor";
-    baseName = ARMOR_NAMES[randomInt(0, ARMOR_NAMES.length - 1)];
-    baseStats.def = Math.floor(power * randomInt(8, 12) / 20) + 1;
-    baseStats.hp = Math.floor(power * 2);
-  } else if (typeRoll < 0.75) {
-    type = "accessory";
-    baseName = ACC_NAMES[randomInt(0, ACC_NAMES.length - 1)];
-    baseStats.str = Math.floor(power / 15);
-    baseStats.vit = Math.floor(power / 15);
-  } else if (typeRoll < 0.90) {
-    type = "skill";
-    const templates = SKILL_TEMPLATES.filter(s => !s.rarity || s.rarity === rarityKey);
-    const template = templates.length > 0 ? templates[randomInt(0, templates.length - 1)] : SKILL_TEMPLATES[0];
-    baseName = `${template.name}の巻物`;
-    skillData = { ...template };
-    skillData.power = template.type === 'attack' ? template.power + (power * 0.01) : template.power + Math.floor(power/2);
-    inkSlots = RARITIES[rarityKey].inkSlots;
-  } else {
-    // Ink Drop
-    return generateInk(floor);
-  }
-
-  const options = type === 'skill' ? [] : generateOptions(rarityKey, power, dungeonMods);
-  const prefix = type === 'skill' ? '' : ITEM_PREFIXES[Math.min(Math.floor(floor / 10), ITEM_PREFIXES.length - 1)];
-  
-  return {
-    id: Date.now() + Math.random().toString(36).substr(2, 9),
-    name: `${prefix}${baseName}`,
-    type,
-    baseStats,
-    options,
-    skillData,
-    inkSlots,
-    inks,
-    rarity: rarityKey,
-    power: Math.floor(power),
-    isNew: true
-  };
-};
-
-const generateMagicStone = (floor) => {
-  const tier = Math.floor(floor);
-  const rand = Math.random();
-  let rarityKey = "common";
-  if (rand > 0.95) rarityKey = "legendary";
-  else if (rand > 0.85) rarityKey = "epic";
-  else if (rand > 0.65) rarityKey = "rare";
-  else if (rand > 0.40) rarityKey = "uncommon";
-  
-  const rarityConfig = RARITIES[rarityKey];
-  const modCount = randomInt(1, rarityConfig.optCount);
-  const mods = [];
-  
-  const risks = STONE_MODS.filter(m => m.isRisk);
-  const rewards = STONE_MODS.filter(m => m.isReward);
-
-  mods.push({ ...risks[randomInt(0, risks.length - 1)], val: randomInt(20, 50) }); 
-
-  for(let i=0; i<modCount; i++) {
-     const pool = Math.random() > 0.5 ? risks : rewards;
-     const mod = pool[randomInt(0, pool.length - 1)];
-     if (mod.valMin) mods.push({ ...mod, val: randomInt(mod.valMin, mod.valMax) });
-     else mods.push({ ...mod }); 
-  }
-
-  let baseFloor = 5 + randomInt(0, 5);
-  mods.forEach(m => {
-      if(m.type === 'mod_floor_add') baseFloor += m.val;
-      if(m.type === 'mod_floor_sub') baseFloor -= m.val;
-  });
-  const maxFloor = Math.max(3, baseFloor);
-
-  return {
-    id: 'stone_' + Date.now() + Math.random(),
-    name: `魔法石 Lv.${tier}`,
-    tier,
-    mods,
-    type: 'stone',
-    rarity: rarityKey,
-    maxFloor
-  };
-};
-
-// ==========================================
-// Section 3: Sub Components
-// ==========================================
-
-const ItemIcon = ({ item, size = 24 }) => {
-  if (item.type === 'weapon') return <Sword size={size} />;
-  if (item.type === 'armor') return <Shield size={size} />;
-  if (item.type === 'stone') return <MapIcon size={size} />;
-  if (item.type === 'ink') return <Droplet size={size} className="text-purple-400" />;
-  if (item.type === 'skill') {
-      const el = item.skillData?.element || 'none';
-      return ELEMENT_CONFIG[el].icon;
-  }
-  return <Gem size={size} />;
-};
-
-const ItemSlot = React.memo(({ item, onClick, isEquipped = false, isSelected = false }) => {
-  if (!item) return (
-      <div className="aspect-square bg-gray-800 rounded-lg border-2 border-gray-700 flex items-center justify-center opacity-50">
-          <div className="w-3 h-3 rounded-full bg-gray-700" />
-      </div>
-  );
-
-  const isStone = item.type === 'stone';
-  const isSkill = item.type === 'skill';
-  const isInk = item.type === 'ink';
-  const rarity = RARITIES[item.rarity] || RARITIES.common;
-  const hasSpecial = item.options?.some(o => o.isSpecial) || (isStone && item.rarity === 'legendary') || (isInk && item.mod.isRare);
-
-  let label = `Lv.${Math.floor(item.power)}`;
-  if (isStone) label = `Lv.${item.tier}`;
-  if (isSkill) label = 'Scroll';
-  if (isInk) label = 'Ink';
-
-  return (
-      <button 
-          onClick={() => onClick(item)}
-          className={`aspect-square relative rounded-lg p-2 flex flex-col items-center justify-center border-2 transition-all hover:scale-110 hover:shadow-lg active:scale-95 
-            ${rarity.bg} ${isSelected ? 'border-white shadow-[0_0_15px_white] ring-2 ring-white' : rarity.border}`}
-      >
-          <div className={`${rarity.color} relative`}>
-              <ItemIcon item={item} size={28} />
-              {hasSpecial && <Sparkles size={14} className="absolute -top-1 -right-2 text-yellow-200 animate-pulse" />}
-              {isSkill && item.inks && item.inks.length > 0 && (
-                 <div className="absolute -bottom-1 -right-2 flex gap-0.5">
-                    {item.inks.map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-purple-500 border border-black" />)}
-                 </div>
-              )}
-          </div>
-          {item.isNew && !isEquipped && (
-              <div className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border-2 border-gray-900" />
-          )}
-          {isEquipped && (
-              <div className="absolute -top-2 -left-2 bg-yellow-600 text-[10px] px-1.5 py-0.5 rounded text-white font-bold border-2 border-gray-900">E</div>
-          )}
-          <div className="text-[10px] text-gray-300 truncate w-full text-center mt-1.5 px-1 leading-tight font-medium">
-            {label}
-          </div>
-      </button>
-  );
-});
+import { ItemSlot } from './components/ItemSlot';
+import { ItemIcon } from './components/ItemIcon';
+import { SkillTree } from './components/SkillTree';
+import { SKILL_TREE } from './constants.jsx';
 
 // ==========================================
 // Section 4: Main Component
@@ -407,13 +48,19 @@ export default function HackSlashGame() {
   const [floatingTexts, setFloatingTexts] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
   const [inkModeItem, setInkModeItem] = useState(null);
+  const [equipmentItemMode, setEquipmentItemMode] = useState(null); // 装備品用アイテム使用モード
   
   useEffect(() => {
     const saved = localStorage.getItem('hackslash_save_v7');
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        setPlayer(data.player);
+        setPlayer({
+          ...INITIAL_PLAYER,
+          ...data.player,
+          skillPoints: data.player.skillPoints || 0,
+          learnedSkills: data.player.learnedSkills || {},
+        });
         setEquipment({...INITIAL_EQUIPMENT, ...data.equipment}); 
         setInventory(data.inventory || []);
         setStones(data.stones || []);
@@ -433,7 +80,7 @@ export default function HackSlashGame() {
     let stats = {
       str: player.stats.str, vit: player.stats.vit, dex: player.stats.dex,
       atk: 0, def: 0, hp: 0,
-      vamp: 0, goldMult: 0, expMult: 0, critDmg: 0,
+      vamp: 0, goldMult: 0, expMult: 0, critDmg: 0, crit: 0,
       res_fire: 0, res_ice: 0, res_thunder: 0, res_light: 0, res_dark: 0,
       cdSpeed: 0
     };
@@ -464,13 +111,83 @@ export default function HackSlashGame() {
         });
     }
 
+    // 習得済みスキルの効果を適用
+    if (player.learnedSkills) {
+      SKILL_TREE.forEach(skill => {
+        const level = player.learnedSkills[skill.id] || 0;
+        if (level > 0 && skill.levelData) {
+          const levelData = skill.levelData;
+          const effect = levelData.effect;
+          const value = levelData.value;
+          
+          if (effect === 'str') stats.str += value;
+          else if (effect === 'vit') stats.vit += value;
+          else if (effect === 'dex') stats.dex += value;
+          else if (effect === 'atk_mult') stats.atk = Math.floor(stats.atk * (1 + value));
+          else if (effect === 'def_mult') stats.def = Math.floor(stats.def * (1 + value));
+          else if (effect === 'hp_mult') stats.hp = Math.floor(stats.hp * (1 + value));
+          else if (effect === 'crit') stats.crit = Math.min(100, (stats.crit || 0) + value);
+          else if (effect === 'vamp') stats.vamp += value;
+          else if (effect === 'cdSpeed') stats.cdSpeed += value;
+          else if (effect === 'goldMult') stats.goldMult += value;
+          else if (effect === 'expMult') stats.expMult += value;
+          else if (effect === 'critDmg') stats.critDmg += value;
+          else if (effect === 'res_fire') stats.res_fire += value;
+          else if (effect === 'res_ice') stats.res_ice += value;
+          else if (effect === 'res_thunder') stats.res_thunder += value;
+          else if (effect === 'res_light') stats.res_light += value;
+          else if (effect === 'res_dark') stats.res_dark += value;
+          else if (effect === 'res_all') {
+            stats.res_fire += value;
+            stats.res_ice += value;
+            stats.res_thunder += value;
+            stats.res_light += value;
+            stats.res_dark += value;
+          }
+          else if (effect === 'all_stats') {
+            stats.str = Math.floor(stats.str * (1 + value));
+            stats.vit = Math.floor(stats.vit * (1 + value));
+            stats.dex = Math.floor(stats.dex * (1 + value));
+          }
+          
+          // ボーナス効果
+          if (levelData.bonus) {
+            const bonusEffect = levelData.bonus.effect;
+            const bonusValue = levelData.bonus.value;
+            if (bonusEffect === 'res_fire') stats.res_fire += bonusValue;
+            else if (bonusEffect === 'res_ice') stats.res_ice += bonusValue;
+            else if (bonusEffect === 'res_thunder') stats.res_thunder += bonusValue;
+            else if (bonusEffect === 'res_light') stats.res_light += bonusValue;
+            else if (bonusEffect === 'res_dark') stats.res_dark += bonusValue;
+            else if (bonusEffect === 'res_all') {
+              stats.res_fire += bonusValue;
+              stats.res_ice += bonusValue;
+              stats.res_thunder += bonusValue;
+              stats.res_light += bonusValue;
+              stats.res_dark += bonusValue;
+            }
+            else if (bonusEffect === 'hp_mult') stats.hp = Math.floor(stats.hp * (1 + bonusValue));
+            else if (bonusEffect === 'expMult') stats.expMult += bonusValue;
+            else if (bonusEffect === 'critDmg') stats.critDmg += bonusValue;
+          }
+          
+          // ペナルティ効果
+          if (levelData.penalty) {
+            const penaltyEffect = levelData.penalty.effect;
+            const penaltyValue = levelData.penalty.value;
+            if (penaltyEffect === 'def_mult') stats.def = Math.floor(stats.def * (1 + penaltyValue));
+          }
+        }
+      });
+    }
+
     const finalAtk = stats.atk + (stats.str * 2);
     const finalDef = stats.def + Math.floor(stats.vit / 2);
     const finalMaxHp = 100 + (stats.vit * 10) + stats.hp;
     const finalCrit = Math.min(75, stats.dex * 0.5);
 
     return { atk: finalAtk, def: finalDef, maxHp: finalMaxHp, crit: finalCrit, ...stats };
-  }, [player.stats, equipment, player.buffs]);
+  }, [player.stats, equipment, player.buffs, player.learnedSkills]);
 
   // --- Dungeon Logic ---
 
@@ -591,7 +308,7 @@ export default function HackSlashGame() {
               let dmg = Math.floor(getStats.atk * finalPower);
               setEnemy(prev => {
                   const newHp = Math.max(0, prev.hp - dmg);
-                  spawnFloatingText(dmg, ELEMENT_CONFIG[base.element].color.replace('text-',''), false);
+                  spawnFloatingText(dmg, getElementConfig(base.element).color.replace('text-',''), false);
                   if (newHp <= 0) winBattle(prev); 
                   return { ...prev, hp: newHp };
               });
@@ -615,7 +332,7 @@ export default function HackSlashGame() {
           return next;
       });
       
-      if (base.type !== 'buff') addLog(`${base.name}!`, ELEMENT_CONFIG[base.element].color.split('-')[1]);
+      if (base.type !== 'buff') addLog(`${base.name}!`, getElementConfig(base.element).color.split('-')[1]);
   };
 
   const handleUseSkill = (slotNum) => {
@@ -672,8 +389,9 @@ export default function HackSlashGame() {
       newPlayer.exp -= newPlayer.expToNext;
       newPlayer.expToNext = Math.floor(newPlayer.expToNext * 1.2);
       newPlayer.statPoints += 3;
+      newPlayer.skillPoints = (newPlayer.skillPoints || 0) + 1;
       newPlayer.hp = getStats.maxHp;
-      addLog(`Level Up! ${newPlayer.level}`, 'yellow');
+      addLog(`Level Up! ${newPlayer.level} (+1スキルポイント)`, 'yellow');
     }
     setPlayer(newPlayer);
 
@@ -734,6 +452,35 @@ export default function HackSlashGame() {
     }
   };
   
+  const learnSkill = (skillId) => {
+    const skill = SKILL_TREE.find(s => s.id === skillId);
+    if (!skill) return;
+    
+    const currentLevel = player.learnedSkills[skillId] || 0;
+    if (currentLevel >= 1) return; // maxLevelは常に1
+    if ((player.skillPoints || 0) <= 0) return;
+    
+    // 前提条件チェック
+    if (skill.requirements.length > 0) {
+      for (const reqId of skill.requirements) {
+        if ((player.learnedSkills[reqId] || 0) < 1) {
+          addLog('前提スキルが未習得です', 'red');
+          return;
+        }
+      }
+    }
+    
+    setPlayer(p => ({
+      ...p,
+      skillPoints: (p.skillPoints || 0) - 1,
+      learnedSkills: {
+        ...p.learnedSkills,
+        [skillId]: 1
+      }
+    }));
+    addLog(`${skill.name} を習得しました`, 'green');
+  };
+  
   const equipItem = (item, slotIndex = null) => { 
     let slot = item.type;
     if (item.type === 'skill') {
@@ -786,6 +533,188 @@ export default function HackSlashGame() {
       
       setInkModeItem(updatedScroll);
       setSelectedItem(null);
+  };
+
+  // 装備品用アイテムを使用
+  const useItemOnEquipment = (item, targetEquipment) => {
+    if (!item || !targetEquipment) return;
+    
+    // 装備品用アイテムでない場合はスキップ
+    const equipmentItemTypes = ['enhancement_stone', 'enchant_scroll', 'element_stone', 'special_stone', 'reroll_scroll', 'option_slot_stone', 'rarity_upgrade_stone'];
+    if (!equipmentItemTypes.includes(item.type)) return;
+
+    let updatedEquipment = { ...targetEquipment };
+    let success = false;
+    let message = '';
+
+    if (item.type === 'enhancement_stone') {
+      // 強化石: 基本ステータスを強化
+      const mult = item.mult || 0.1;
+      const newBaseStats = { ...updatedEquipment.baseStats };
+      Object.keys(newBaseStats).forEach(key => {
+        newBaseStats[key] = Math.floor(newBaseStats[key] * (1 + mult));
+      });
+      updatedEquipment.baseStats = newBaseStats;
+      success = true;
+      message = `基本ステータスが${(mult * 100).toFixed(0)}%強化されました`;
+    }
+    else if (item.type === 'enchant_scroll') {
+      // エンチャントスクロール: オプションを追加
+      const maxOptions = RARITIES[updatedEquipment.rarity].optCount;
+      if ((updatedEquipment.options?.length || 0) >= maxOptions) {
+        addLog('オプション枠が満杯です', 'red');
+        return;
+      }
+      const power = updatedEquipment.power || 1;
+      const powerMult = item.powerMult || 1.0;
+      const pool = [...BASIC_OPTIONS];
+      const optType = pool[Math.floor(Math.random() * pool.length)];
+      let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100 * powerMult));
+      
+      if (optType.type === 'maxHp') val *= 5;
+      if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
+      if (optType.isRes) val = Math.floor(5 + Math.random() * 15 * powerMult);
+      
+      updatedEquipment.options = [...(updatedEquipment.options || []), { ...optType, val, isSpecial: false }];
+      success = true;
+      message = `オプション「${optType.label} +${val}${optType.unit || ''}」が追加されました`;
+    }
+    else if (item.type === 'element_stone') {
+      // 属性付与石: 属性耐性を付与
+      const maxOptions = RARITIES[updatedEquipment.rarity].optCount;
+      if ((updatedEquipment.options?.length || 0) >= maxOptions) {
+        addLog('オプション枠が満杯です', 'red');
+        return;
+      }
+      const resType = `res_${item.element}`;
+      const resOption = BASIC_OPTIONS.find(o => o.type === resType);
+      if (resOption) {
+        updatedEquipment.options = [...(updatedEquipment.options || []), { ...resOption, val: item.value || 10, isSpecial: false }];
+        success = true;
+        message = `${getElementConfig(item.element).label}耐性 +${item.value}%が追加されました`;
+      }
+    }
+    else if (item.type === 'special_stone') {
+      // 特殊強化アイテム: 特殊オプションを付与
+      const maxOptions = RARITIES[updatedEquipment.rarity].optCount;
+      if ((updatedEquipment.options?.length || 0) >= maxOptions) {
+        addLog('オプション枠が満杯です', 'red');
+        return;
+      }
+      const specialOption = SPECIAL_OPTIONS.find(o => o.type === item.specialType);
+      if (specialOption) {
+        updatedEquipment.options = [...(updatedEquipment.options || []), { ...specialOption, val: item.value || 10, isSpecial: true }];
+        success = true;
+        message = `特殊オプション「${specialOption.label} +${item.value}${specialOption.unit || ''}」が追加されました`;
+      }
+    }
+    else if (item.type === 'reroll_scroll') {
+      // リロールスクロール: オプションを変更
+      if (!updatedEquipment.options || updatedEquipment.options.length === 0) {
+        addLog('変更できるオプションがありません', 'red');
+        return;
+      }
+      const optionIndex = Math.floor(Math.random() * updatedEquipment.options.length);
+      const power = updatedEquipment.power || 1;
+      const powerMult = item.powerMult || 1.0;
+      const pool = [...BASIC_OPTIONS, ...SPECIAL_OPTIONS];
+      const optType = pool[Math.floor(Math.random() * pool.length)];
+      let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100 * powerMult));
+      
+      if (optType.type === 'maxHp') val *= 5;
+      if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
+      if (optType.isRes) val = Math.floor(5 + Math.random() * 15 * powerMult);
+      if (optType.min && optType.max) val = Math.floor(optType.min + Math.random() * (optType.max - optType.min) * powerMult);
+      
+      const newOptions = [...updatedEquipment.options];
+      newOptions[optionIndex] = { ...optType, val, isSpecial: optType.min !== undefined };
+      updatedEquipment.options = newOptions;
+      success = true;
+      message = `オプションが「${optType.label} +${val}${optType.unit || ''}」に変更されました`;
+    }
+    else if (item.type === 'option_slot_stone') {
+      // オプション枠拡張石: オプション枠を増やす
+      const currentMax = RARITIES[updatedEquipment.rarity].optCount;
+      const newMax = currentMax + (item.slots || 1);
+      if (newMax > 5) {
+        addLog('オプション枠は最大5までです', 'red');
+        return;
+      }
+      // レアリティを上げる必要がある場合
+      const currentRarityIndex = RARITY_ORDER.indexOf(updatedEquipment.rarity);
+      let targetRarity = updatedEquipment.rarity;
+      for (let i = currentRarityIndex + 1; i < RARITY_ORDER.length; i++) {
+        if (RARITIES[RARITY_ORDER[i]].optCount >= newMax) {
+          targetRarity = RARITY_ORDER[i];
+          break;
+        }
+      }
+      if (targetRarity !== updatedEquipment.rarity) {
+        updatedEquipment.rarity = targetRarity;
+      }
+      success = true;
+      message = `オプション枠が${item.slots || 1}つ増えました`;
+    }
+    else if (item.type === 'rarity_upgrade_stone') {
+      // レアリティアップグレード石: レアリティを上げる
+      const currentRarityIndex = RARITY_ORDER.indexOf(updatedEquipment.rarity);
+      if (currentRarityIndex >= RARITY_ORDER.length - 1) {
+        addLog('既に最高レアリティです', 'red');
+        return;
+      }
+      const upgrades = item.upgrades || 1;
+      const newIndex = Math.min(currentRarityIndex + upgrades, RARITY_ORDER.length - 1);
+      const newRarity = RARITY_ORDER[newIndex];
+      
+      // レアリティが上がった場合、オプション枠が増える可能性がある
+      const oldMaxOptions = RARITIES[updatedEquipment.rarity].optCount;
+      const newMaxOptions = RARITIES[newRarity].optCount;
+      
+      updatedEquipment.rarity = newRarity;
+      
+      // オプション枠が増えた場合、新しいオプションを生成
+      if (newMaxOptions > oldMaxOptions) {
+        const currentOptions = updatedEquipment.options || [];
+        const additionalSlots = newMaxOptions - oldMaxOptions;
+        const power = updatedEquipment.power || 1;
+        
+        // 追加分のオプションを生成
+        const pool = [...BASIC_OPTIONS];
+        const newOptions = [];
+        for (let i = 0; i < additionalSlots; i++) {
+          const optType = pool[Math.floor(Math.random() * pool.length)];
+          let val = Math.max(1, Math.floor(power * (Math.random() * 10 + 5) / 100));
+          
+          if (optType.type === 'maxHp') val *= 5;
+          if (['str','vit','dex'].includes(optType.type)) val = Math.max(1, Math.floor(val / 2));
+          if (optType.isRes) val = Math.floor(5 + Math.random() * 15);
+          
+          newOptions.push({ ...optType, val, isSpecial: false });
+        }
+        
+        updatedEquipment.options = [...currentOptions, ...newOptions];
+      }
+      
+      success = true;
+      message = `レアリティが${RARITIES[newRarity].label}に上がりました`;
+    }
+
+    if (success) {
+      // 装備中のアイテムを更新
+      const slotKey = Object.keys(equipment).find(key => equipment[key]?.id === targetEquipment.id);
+      if (slotKey) {
+        setEquipment(prev => ({ ...prev, [slotKey]: updatedEquipment }));
+      } else {
+        // インベントリ内のアイテムを更新
+        setInventory(prev => prev.map(i => i.id === targetEquipment.id ? updatedEquipment : i));
+      }
+      
+      // 使用したアイテムを削除
+      setInventory(prev => prev.filter(i => i.id !== item.id));
+      setEquipmentItemMode(null);
+      setSelectedItem(null);
+      addLog(message, 'green');
+    }
   };
 
   const addLog = (msg, color) => setLogs(p => [{id: Date.now()+Math.random(), msg, color}, ...p].slice(0, 10));
@@ -864,6 +793,11 @@ export default function HackSlashGame() {
                     <span className="hidden md:inline">ステータス</span>
                     {player.statPoints > 0 && <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-gray-900" />}
                 </button>
+                <button onClick={() => setTab('skills')} className={`px-4 py-2 rounded-lg transition-all relative ${tab === 'skills' ? 'bg-purple-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                    <Sparkles size={20} className="inline mr-2" />
+                    <span className="hidden md:inline">スキル</span>
+                    {(player.skillPoints || 0) > 0 && <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-gray-900" />}
+                </button>
             </div>
         ) : (
             <button onClick={returnToTown} className="bg-red-900/50 text-red-200 px-4 py-2 rounded-lg border border-red-800 flex items-center gap-2 hover:bg-red-900 transition-all">
@@ -912,12 +846,104 @@ export default function HackSlashGame() {
                             </div>
                         ))}
                         <div className="mt-6 pt-6 border-t border-gray-700">
+                            <h4 className="text-sm font-bold text-gray-400 mb-3">戦闘ステータス</h4>
+                            <div className="space-y-2 mb-4">
+                                <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                    <span className="text-gray-400">攻撃力</span>
+                                    <span className="text-red-400 font-bold">{getStats.atk}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                    <span className="text-gray-400">防御力</span>
+                                    <span className="text-blue-400 font-bold">{getStats.def}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                    <span className="text-gray-400">最大HP</span>
+                                    <span className="text-green-400 font-bold">{getStats.maxHp}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                    <span className="text-gray-400">会心率</span>
+                                    <span className="text-yellow-400 font-bold">{getStats.crit.toFixed(1)}%</span>
+                                </div>
+                                {getStats.critDmg > 0 && (
+                                    <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                        <span className="text-gray-400">会心ダメージ</span>
+                                        <span className="text-yellow-400 font-bold">+{getStats.critDmg}%</span>
+                                    </div>
+                                )}
+                                {getStats.vamp > 0 && (
+                                    <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                        <span className="text-gray-400">HP吸収</span>
+                                        <span className="text-red-400 font-bold">{getStats.vamp}%</span>
+                                    </div>
+                                )}
+                                {getStats.cdSpeed > 0 && (
+                                    <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                        <span className="text-gray-400">CD速度</span>
+                                        <span className="text-cyan-400 font-bold">+{getStats.cdSpeed * 100}%</span>
+                                    </div>
+                                )}
+                                {(getStats.goldMult > 0 || getStats.expMult > 0) && (
+                                    <>
+                                        {getStats.goldMult > 0 && (
+                                            <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                                <span className="text-gray-400">G獲得</span>
+                                                <span className="text-yellow-400 font-bold">+{getStats.goldMult}%</span>
+                                            </div>
+                                        )}
+                                        {getStats.expMult > 0 && (
+                                            <div className="flex justify-between items-center bg-gray-800 p-2 rounded text-xs">
+                                                <span className="text-gray-400">EXP獲得</span>
+                                                <span className="text-green-400 font-bold">+{getStats.expMult}%</span>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                            {(getStats.res_fire > 0 || getStats.res_ice > 0 || getStats.res_thunder > 0 || getStats.res_light > 0 || getStats.res_dark > 0) && (
+                                <div className="mb-4">
+                                    <h5 className="text-xs font-bold text-gray-500 mb-2">属性耐性</h5>
+                                    <div className="grid grid-cols-2 gap-1 text-xs">
+                                        {getStats.res_fire > 0 && (
+                                            <div className="flex justify-between items-center bg-gray-800 p-1.5 rounded">
+                                                <span className="text-red-400">火</span>
+                                                <span className="text-white font-bold">{getStats.res_fire}%</span>
+                                            </div>
+                                        )}
+                                        {getStats.res_ice > 0 && (
+                                            <div className="flex justify-between items-center bg-gray-800 p-1.5 rounded">
+                                                <span className="text-cyan-400">氷</span>
+                                                <span className="text-white font-bold">{getStats.res_ice}%</span>
+                                            </div>
+                                        )}
+                                        {getStats.res_thunder > 0 && (
+                                            <div className="flex justify-between items-center bg-gray-800 p-1.5 rounded">
+                                                <span className="text-yellow-400">雷</span>
+                                                <span className="text-white font-bold">{getStats.res_thunder}%</span>
+                                            </div>
+                                        )}
+                                        {getStats.res_light > 0 && (
+                                            <div className="flex justify-between items-center bg-gray-800 p-1.5 rounded">
+                                                <span className="text-orange-300">光</span>
+                                                <span className="text-white font-bold">{getStats.res_light}%</span>
+                                            </div>
+                                        )}
+                                        {getStats.res_dark > 0 && (
+                                            <div className="flex justify-between items-center bg-gray-800 p-1.5 rounded">
+                                                <span className="text-purple-400">闇</span>
+                                                <span className="text-white font-bold">{getStats.res_dark}%</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-6 pt-6 border-t border-gray-700">
                             <h4 className="text-sm font-bold text-gray-400 mb-3">装備中</h4>
                             <div className="space-y-3">
                                 {['weapon', 'armor', 'accessory'].map(slot => (
                                     <div key={slot} className="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-700">
-                                        <div className="w-12 h-12 flex-shrink-0">
-                                            <ItemSlot item={equipment[slot]} onClick={() => setSelectedItem({...equipment[slot], isEquipped: true})} isEquipped={true} />
+                                        <div className="w-16 h-16 flex-shrink-0">
+                                            <ItemSlot item={equipment[slot]} onClick={() => setSelectedItem({...equipment[slot], isEquipped: true})} isEquipped={true} iconSize={32} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="text-xs text-gray-500 uppercase mb-1">{slot === 'weapon' ? '武器' : slot === 'armor' ? '防具' : 'アクセサリ'}</div>
@@ -933,8 +959,8 @@ export default function HackSlashGame() {
                                 <div className="space-y-2">
                                     {[1, 2, 3].map(num => (
                                         <div key={`skill${num}`} className="flex items-center gap-3 bg-gray-800 p-2 rounded-lg border border-gray-700">
-                                            <div className="w-10 h-10 flex-shrink-0">
-                                                <ItemSlot item={equipment[`skill${num}`]} onClick={() => setSelectedItem({...equipment[`skill${num}`], isEquipped: true})} isEquipped={true} />
+                                            <div className="w-14 h-14 flex-shrink-0">
+                                                <ItemSlot item={equipment[`skill${num}`]} onClick={() => setSelectedItem({...equipment[`skill${num}`], isEquipped: true})} isEquipped={true} iconSize={28} />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="text-xs text-gray-500 mb-1">スキル {num}</div>
@@ -998,8 +1024,8 @@ export default function HackSlashGame() {
                                 <div className="flex justify-center gap-6 mb-6">
                                     {['weapon', 'armor', 'accessory'].map(slot => (
                                         <div key={slot} className="flex flex-col items-center gap-2">
-                                            <div className="w-16 h-16">
-                                                <ItemSlot item={equipment[slot]} onClick={() => setSelectedItem({...equipment[slot], isEquipped: true})} isEquipped={true} />
+                                            <div className="w-20 h-20">
+                                                <ItemSlot item={equipment[slot]} onClick={() => setSelectedItem({...equipment[slot], isEquipped: true})} isEquipped={true} iconSize={40} />
                                             </div>
                                             <span className="text-xs text-gray-500 uppercase">{slot === 'weapon' ? '武器' : slot === 'armor' ? '防具' : 'アクセサリ'}</span>
                                         </div>
@@ -1008,8 +1034,8 @@ export default function HackSlashGame() {
                                 <div className="flex justify-center gap-4 pt-4 border-t border-gray-700">
                                     {[1, 2, 3].map(num => (
                                         <div key={`skill${num}`} className="flex flex-col items-center gap-2">
-                                            <div className="w-14 h-14">
-                                                <ItemSlot item={equipment[`skill${num}`]} onClick={() => setSelectedItem({...equipment[`skill${num}`], isEquipped: true})} isEquipped={true} />
+                                            <div className="w-16 h-16">
+                                                <ItemSlot item={equipment[`skill${num}`]} onClick={() => setSelectedItem({...equipment[`skill${num}`], isEquipped: true})} isEquipped={true} iconSize={32} />
                                             </div>
                                             <span className="text-xs text-gray-500 uppercase">スキル {num}</span>
                                         </div>
@@ -1036,29 +1062,156 @@ export default function HackSlashGame() {
                             <h2 className="text-2xl font-bold text-yellow-500 mb-8 flex items-center gap-3">
                                 <Trophy size={28}/> ステータス詳細
                             </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                                    <div className="text-sm text-gray-400 mb-2">未割り当てポイント</div>
-                                    <div className="text-5xl font-bold text-white mb-2">{player.statPoints}</div>
-                                    {player.statPoints > 0 && <div className="text-sm text-yellow-500 animate-pulse">未割り当て</div>}
-                                </div>
-                                {['str','vit','dex'].map(k => (
-                                    <div key={k} className="bg-gray-800 p-6 rounded-xl border border-gray-700 hover:bg-gray-750 transition-colors">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <span className="text-gray-300 uppercase font-bold text-lg">
-                                                {k === 'str' ? '筋力' : k === 'vit' ? '体力' : '幸運'}
-                                            </span>
-                                            {player.statPoints > 0 && (
-                                                <button onClick={() => increaseStat(k)} className="w-10 h-10 bg-yellow-600 rounded-lg text-white font-bold hover:bg-yellow-500 transition-colors">
-                                                    +
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div className="text-4xl font-mono text-white">{player.stats[k]}</div>
+                            
+                            {/* 基本ステータス */}
+                            <div className="mb-8">
+                                <h3 className="text-lg font-bold text-gray-300 mb-4">基本ステータス</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                                        <div className="text-sm text-gray-400 mb-2">未割り当てポイント</div>
+                                        <div className="text-5xl font-bold text-white mb-2">{player.statPoints}</div>
+                                        {player.statPoints > 0 && <div className="text-sm text-yellow-500 animate-pulse">未割り当て</div>}
                                     </div>
-                                ))}
+                                    {['str','vit','dex'].map(k => (
+                                        <div key={k} className="bg-gray-800 p-6 rounded-xl border border-gray-700 hover:bg-gray-750 transition-colors">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <span className="text-gray-300 uppercase font-bold text-lg">
+                                                    {k === 'str' ? '筋力' : k === 'vit' ? '体力' : '幸運'}
+                                                </span>
+                                                {player.statPoints > 0 && (
+                                                    <button onClick={() => increaseStat(k)} className="w-10 h-10 bg-yellow-600 rounded-lg text-white font-bold hover:bg-yellow-500 transition-colors">
+                                                        +
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="text-4xl font-mono text-white">{player.stats[k]}</div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
+
+                            {/* 戦闘ステータス */}
+                            <div className="mb-8">
+                                <h3 className="text-lg font-bold text-gray-300 mb-4">戦闘ステータス</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                        <div className="text-xs text-gray-400 mb-1">攻撃力</div>
+                                        <div className="text-3xl font-bold text-red-400">{getStats.atk}</div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            基本: {getStats.atk - (getStats.str * 2)} + 筋力×2
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                        <div className="text-xs text-gray-400 mb-1">防御力</div>
+                                        <div className="text-3xl font-bold text-blue-400">{getStats.def}</div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            基本: {getStats.def - Math.floor(getStats.vit / 2)} + 体力÷2
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                        <div className="text-xs text-gray-400 mb-1">最大HP</div>
+                                        <div className="text-3xl font-bold text-green-400">{getStats.maxHp}</div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            基本: 100 + 体力×10 + 装備
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                        <div className="text-xs text-gray-400 mb-1">会心率</div>
+                                        <div className="text-3xl font-bold text-yellow-400">{getStats.crit.toFixed(1)}%</div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            幸運×0.5 (最大75%)
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 特殊オプション */}
+                            {(getStats.vamp > 0 || getStats.critDmg > 0 || getStats.cdSpeed > 0 || getStats.goldMult > 0 || getStats.expMult > 0) && (
+                                <div className="mb-8">
+                                    <h3 className="text-lg font-bold text-gray-300 mb-4">特殊オプション</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {getStats.vamp > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-gray-400 mb-1">HP吸収</div>
+                                                <div className="text-2xl font-bold text-red-400">{getStats.vamp}%</div>
+                                            </div>
+                                        )}
+                                        {getStats.critDmg > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-gray-400 mb-1">会心ダメージ</div>
+                                                <div className="text-2xl font-bold text-yellow-400">+{getStats.critDmg}%</div>
+                                            </div>
+                                        )}
+                                        {getStats.cdSpeed > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-gray-400 mb-1">CD速度</div>
+                                                <div className="text-2xl font-bold text-cyan-400">+{(getStats.cdSpeed * 100).toFixed(0)}%</div>
+                                            </div>
+                                        )}
+                                        {getStats.goldMult > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-gray-400 mb-1">G獲得</div>
+                                                <div className="text-2xl font-bold text-yellow-400">+{getStats.goldMult}%</div>
+                                            </div>
+                                        )}
+                                        {getStats.expMult > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-gray-400 mb-1">EXP獲得</div>
+                                                <div className="text-2xl font-bold text-green-400">+{getStats.expMult}%</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 属性耐性 */}
+                            {(getStats.res_fire > 0 || getStats.res_ice > 0 || getStats.res_thunder > 0 || getStats.res_light > 0 || getStats.res_dark > 0) && (
+                                <div className="mb-8">
+                                    <h3 className="text-lg font-bold text-gray-300 mb-4">属性耐性</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        {getStats.res_fire > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-red-400 mb-1">火耐性</div>
+                                                <div className="text-2xl font-bold text-white">{getStats.res_fire}%</div>
+                                            </div>
+                                        )}
+                                        {getStats.res_ice > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-cyan-400 mb-1">氷耐性</div>
+                                                <div className="text-2xl font-bold text-white">{getStats.res_ice}%</div>
+                                            </div>
+                                        )}
+                                        {getStats.res_thunder > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-yellow-400 mb-1">雷耐性</div>
+                                                <div className="text-2xl font-bold text-white">{getStats.res_thunder}%</div>
+                                            </div>
+                                        )}
+                                        {getStats.res_light > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-orange-300 mb-1">光耐性</div>
+                                                <div className="text-2xl font-bold text-white">{getStats.res_light}%</div>
+                                            </div>
+                                        )}
+                                        {getStats.res_dark > 0 && (
+                                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                                <div className="text-xs text-purple-400 mb-1">闇耐性</div>
+                                                <div className="text-2xl font-bold text-white">{getStats.res_dark}%</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
+                    )}
+
+                    {tab === 'skills' && (
+                        <SkillTree 
+                            learnedSkills={player.learnedSkills || {}}
+                            skillPoints={player.skillPoints || 0}
+                            onLearnSkill={learnSkill}
+                            playerLevel={player.level}
+                        />
                     )}
                 </div>
             </div>
@@ -1114,7 +1267,7 @@ export default function HackSlashGame() {
                             </div>
                             <div className="w-full max-w-md text-center">
                                 <h2 className={`text-2xl font-bold flex items-center justify-center gap-2 mb-4 ${enemy.isBoss ? 'text-red-400' : 'text-gray-300'}`}>
-                                    {enemy.element !== 'none' && ELEMENT_CONFIG[enemy.element].icon}
+                                    {enemy.element !== 'none' && getElementConfig(enemy.element).icon}
                                     {enemy.name}
                                 </h2>
                                 <div className="h-4 bg-gray-800 rounded-full overflow-hidden border-2 border-gray-700 mb-2">
@@ -1146,7 +1299,7 @@ export default function HackSlashGame() {
                                     >
                                         {skill ? (
                                             <>
-                                                <div className="text-2xl mb-1">{ELEMENT_CONFIG[skill.skillData.element].icon}</div>
+                                                <div className="text-2xl mb-1">{getElementConfig(skill.skillData.element).icon}</div>
                                                 <span className="text-xs leading-none text-center px-1">{skill.skillData.name}</span>
                                                 {cd > 0 && (
                                                     <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
@@ -1204,6 +1357,42 @@ export default function HackSlashGame() {
              </div>
         )}
 
+        {equipmentItemMode && (
+             <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-8">
+                <div className="bg-gray-800 w-full max-w-2xl rounded-xl border-2 border-green-500 p-8 shadow-2xl">
+                    <div className="text-center mb-6">
+                        <h3 className="text-2xl font-bold text-green-400 mb-2">装備品を選択</h3>
+                        <p className="text-sm text-gray-400">{equipmentItemMode.name}を使用する装備品を選んでください</p>
+                    </div>
+                    <div className="mb-6">
+                        <h4 className="text-lg font-bold text-gray-300 mb-3">装備中</h4>
+                        <div className="grid grid-cols-3 gap-3 mb-6">
+                            {['weapon', 'armor', 'accessory'].map(slot => {
+                                const item = equipment[slot];
+                                if (!item) return null;
+                                return (
+                                    <div key={slot} className="flex flex-col items-center gap-2">
+                                        <ItemSlot item={item} onClick={() => useItemOnEquipment(equipmentItemMode, item)} />
+                                        <span className="text-xs text-gray-400">{slot === 'weapon' ? '武器' : slot === 'armor' ? '防具' : 'アクセサリ'}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <h4 className="text-lg font-bold text-gray-300 mb-3">インベントリ</h4>
+                        <div className="grid grid-cols-8 gap-3 max-h-96 overflow-y-auto">
+                            {inventory.filter(i => ['weapon', 'armor', 'accessory'].includes(i.type)).map(item => (
+                                <ItemSlot key={item.id} item={item} onClick={() => useItemOnEquipment(equipmentItemMode, item)} />
+                            ))}
+                            {inventory.filter(i => ['weapon', 'armor', 'accessory'].includes(i.type)).length === 0 && (
+                                <div className="col-span-8 text-center text-gray-500 py-8">対象となる装備品がありません</div>
+                            )}
+                        </div>
+                    </div>
+                    <button onClick={() => setEquipmentItemMode(null)} className="w-full py-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors font-bold">キャンセル</button>
+                </div>
+             </div>
+        )}
+
         {selectedItem?.type === 'portal_basic' && (
             <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-8" onClick={() => setSelectedItem(null)}>
                 <div className="bg-gray-800 w-full max-w-md rounded-xl border-2 border-gray-700 p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -1242,6 +1431,55 @@ export default function HackSlashGame() {
                             </div>
                         )}
 
+                        {selectedItem.type === 'enhancement_stone' && (
+                            <div className="text-yellow-300 mb-4">
+                                <div className="text-lg mb-2">効果: 装備品の基本ステータスを{(selectedItem.mult * 100).toFixed(0)}%強化</div>
+                                <div className="text-sm text-gray-400">武器、防具、アクセサリに使用できます</div>
+                            </div>
+                        )}
+
+                        {selectedItem.type === 'enchant_scroll' && (
+                            <div className="text-blue-300 mb-4">
+                                <div className="text-lg mb-2">効果: 装備品にランダムオプションを1つ追加</div>
+                                <div className="text-sm text-gray-400">オプション枠に空きがある装備品に使用できます</div>
+                            </div>
+                        )}
+
+                        {selectedItem.type === 'element_stone' && (
+                            <div className="text-cyan-300 mb-4">
+                                <div className="text-lg mb-2">効果: {getElementConfig(selectedItem.element).label}耐性 +{selectedItem.value}%を付与</div>
+                                <div className="text-sm text-gray-400">オプション枠に空きがある装備品に使用できます</div>
+                            </div>
+                        )}
+
+                        {selectedItem.type === 'special_stone' && (
+                            <div className="text-purple-300 mb-4">
+                                <div className="text-lg mb-2">効果: 特殊オプション「{SPECIAL_OPTIONS.find(o => o.type === selectedItem.specialType)?.label || ''} +{selectedItem.value}{SPECIAL_OPTIONS.find(o => o.type === selectedItem.specialType)?.unit || ''}」を付与</div>
+                                <div className="text-sm text-gray-400">オプション枠に空きがある装備品に使用できます</div>
+                            </div>
+                        )}
+
+                        {selectedItem.type === 'reroll_scroll' && (
+                            <div className="text-green-300 mb-4">
+                                <div className="text-lg mb-2">効果: 装備品のランダムなオプションを1つ変更</div>
+                                <div className="text-sm text-gray-400">オプションが存在する装備品に使用できます</div>
+                            </div>
+                        )}
+
+                        {selectedItem.type === 'option_slot_stone' && (
+                            <div className="text-cyan-300 mb-4">
+                                <div className="text-lg mb-2">効果: 装備品のオプション枠を{selectedItem.slots || 1}つ増やす</div>
+                                <div className="text-sm text-gray-400">最大5枠まで増やすことができます</div>
+                            </div>
+                        )}
+
+                        {selectedItem.type === 'rarity_upgrade_stone' && (
+                            <div className="text-orange-300 mb-4">
+                                <div className="text-lg mb-2">効果: 装備品のレアリティを{selectedItem.upgrades || 1}段階上げる</div>
+                                <div className="text-sm text-gray-400">レジェンダリーまで上げることができます</div>
+                            </div>
+                        )}
+
                         {selectedItem.type === 'skill' && selectedItem.skillData && (
                             <div className="mb-4">
                                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -1251,7 +1489,7 @@ export default function HackSlashGame() {
                                     </div>
                                     <div className="text-cyan-300 flex justify-between items-center">
                                         <span className="text-gray-400">属性</span>
-                                        <span className="font-bold">{ELEMENT_CONFIG[selectedItem.skillData.element].label}</span>
+                                        <span className="font-bold">{getElementConfig(selectedItem.skillData.element).label}</span>
                                     </div>
                                     <div className="text-cyan-300 flex justify-between items-center">
                                         <span className="text-gray-400">威力</span>
@@ -1293,7 +1531,7 @@ export default function HackSlashGame() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                         {selectedItem.type !== 'stone' && !selectedItem.isEquipped ? (
+                         {selectedItem.type !== 'stone' && !selectedItem.isEquipped && !['enhancement_stone', 'enchant_scroll', 'element_stone', 'special_stone', 'reroll_scroll', 'option_slot_stone', 'rarity_upgrade_stone'].includes(selectedItem.type) ? (
                              <>
                                 <button onClick={() => sellItem(selectedItem)} className="py-4 rounded-lg border-2 border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors font-bold">
                                     売却
@@ -1325,6 +1563,17 @@ export default function HackSlashGame() {
                                     売却
                                 </button>
                                 <button onClick={() => { startDungeon(selectedItem); setSelectedItem(null); }} className="py-4 rounded-lg bg-cyan-700 text-white font-bold text-lg hover:bg-cyan-600 transition-colors">
+                                    使用
+                                </button>
+                            </>
+                         )}
+
+                         {['enhancement_stone', 'enchant_scroll', 'element_stone', 'special_stone', 'reroll_scroll', 'option_slot_stone', 'rarity_upgrade_stone'].includes(selectedItem.type) && (
+                            <>
+                                <button onClick={() => sellItem(selectedItem)} className="py-4 rounded-lg border-2 border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors font-bold">
+                                    売却
+                                </button>
+                                <button onClick={() => { setEquipmentItemMode(selectedItem); setSelectedItem(null); }} className="py-4 rounded-lg bg-green-600 text-white font-bold text-lg hover:bg-green-500 transition-colors">
                                     使用
                                 </button>
                             </>
