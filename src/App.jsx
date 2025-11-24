@@ -38,7 +38,7 @@ import { TownView } from './components/views/TownView';
 import { DungeonView } from './components/views/DungeonView';
 import { InkModal } from './components/modals/InkModal';
 import { PortalModal } from './components/modals/PortalModal';
-import { getSlotLabel, getSlotType, EQUIPMENT_SLOTS, EQUIPMENT_TYPES, canStackEquipmentItem, addEquipmentItemToStack, getCharacterList, getCurrentCharacterId, setCurrentCharacterId, createCharacter, deleteCharacter, getCharacterSaveData, saveCharacterData, updateCharacter } from './utils/gameUtils';
+import { getSlotLabel, getSlotType, EQUIPMENT_SLOTS, EQUIPMENT_TYPES, canStackEquipmentItem, addEquipmentItemToStack, getCharacterList, getCurrentCharacterId, setCurrentCharacterId, createCharacter, deleteCharacter, getCharacterSaveData, saveCharacterData, updateCharacter, canUseEnhancementStone } from './utils/gameUtils';
 
 
 // ==========================================
@@ -1524,6 +1524,14 @@ export default function HackSlashGame() {
     let message = '';
 
     if (item.type === 'enhancement_stone') {
+      // 強化石のレアリティチェック
+      if (!canUseEnhancementStone(item, updatedEquipment)) {
+        const stoneRarityLabel = RARITIES[item.rarity]?.label || item.rarity;
+        const equipmentRarityLabel = RARITIES[updatedEquipment.rarity]?.label || updatedEquipment.rarity;
+        addLog(`${stoneRarityLabel}の強化石は${equipmentRarityLabel}の装備には使用できません`, 'red');
+        return;
+      }
+      
       // 強化石: 基本ステータスを強化
       const mult = item.mult || 0.1;
       const newBaseStats = { ...updatedEquipment.baseStats };
@@ -1531,8 +1539,10 @@ export default function HackSlashGame() {
         newBaseStats[key] = Math.floor(newBaseStats[key] * (1 + mult));
       });
       updatedEquipment.baseStats = newBaseStats;
+      // 強化レベルを増やす
+      updatedEquipment.enhancementLevel = (updatedEquipment.enhancementLevel || 0) + 1;
       success = true;
-      message = `基本ステータスが${(mult * 100).toFixed(0)}%強化されました`;
+      message = `基本ステータスが${(mult * 100).toFixed(0)}%強化されました（強化レベル: +${updatedEquipment.enhancementLevel}）`;
     }
     else if (item.type === 'enchant_scroll') {
       // エンチャントスクロール: オプションを追加

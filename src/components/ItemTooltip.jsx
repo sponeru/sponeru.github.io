@@ -1,6 +1,7 @@
 import React from 'react';
 import { ItemIcon } from './ItemIcon';
 import { RARITIES, getElementConfig, SPECIAL_OPTIONS, BASIC_OPTIONS, EQUIPMENT_TYPE_OPTIONS, STAT_LABELS } from '../constants.jsx';
+import { RARITY_ORDER } from '../utils/gameUtils';
 
 export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false, placement = 'top', positionType = 'absolute', optionDisplayMode = 'merged', equipmentType = null }) => {
   if (!item || !isVisible) return null;
@@ -37,10 +38,16 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
     }
 
     if (item.type === 'enhancement_stone') {
+      const stoneRarityIndex = RARITY_ORDER.indexOf(item.rarity);
+      const usableRarities = stoneRarityIndex >= 0 
+        ? RARITY_ORDER.slice(0, stoneRarityIndex + 1).map(r => RARITIES[r]?.label || r).join('、')
+        : '不明';
+      
       return (
         <div className="text-yellow-300">
           <div className="mb-2 text-base">効果: 装備品の基本ステータスを{(item.mult * 100).toFixed(0)}%強化</div>
-          <div className="text-sm text-gray-400">武器、防具に使用できます</div>
+          <div className="text-sm text-gray-400 mb-1">武器、防具に使用できます</div>
+          <div className="text-sm text-blue-300">使用可能なレアリティ: {usableRarities}</div>
         </div>
       );
     }
@@ -191,6 +198,12 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
       const stats = item.baseStats || item.stats || {};
       return (
         <div>
+          {item.enhancementLevel && item.enhancementLevel > 0 && (
+            <div className="bg-orange-900/30 border border-orange-700 rounded-lg p-2 mb-3">
+              <div className="text-orange-400 text-sm font-bold mb-1">強化レベル: +{item.enhancementLevel}</div>
+              <div className="text-xs text-gray-300">強化石を使用して強化されています</div>
+            </div>
+          )}
           {item.requiredStats && (
             <div className="bg-red-900/30 border border-red-700 rounded-lg p-2 mb-3">
               <div className="text-red-400 text-sm font-bold mb-1">必要能力値:</div>
@@ -378,7 +391,12 @@ export const ItemTooltip = ({ item, position = { x: 0, y: 0 }, isVisible = false
           <div className={`text-sm font-bold uppercase ${rarity.color}`}>
             {rarity.label}
           </div>
-          <div className="text-base font-bold">{item.name || '無名のアイテム'}</div>
+          <div className="text-base font-bold flex items-center gap-2">
+            {item.name || '無名のアイテム'}
+            {item.enhancementLevel && item.enhancementLevel > 0 && (
+              <span className="text-orange-400 text-sm font-bold">+{item.enhancementLevel}</span>
+            )}
+          </div>
         </div>
       </div>
       <div className="text-sm">

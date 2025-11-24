@@ -202,6 +202,11 @@ export const ItemSlot = React.memo(({
           {isEquipped && (
               <div className="absolute -top-2 -left-2 bg-yellow-600 text-[10px] px-1.5 py-0.5 rounded text-white font-bold border-2 border-gray-900">E</div>
           )}
+          {item.enhancementLevel && item.enhancementLevel > 0 && (
+              <div className="absolute -top-2 -right-2 bg-orange-600 text-[10px] px-1.5 py-0.5 rounded text-white font-bold border-2 border-gray-900">
+                +{item.enhancementLevel}
+              </div>
+          )}
           {isEquipmentItem && item.count && item.count > 1 && (
               <div className="absolute -bottom-1 -right-1 bg-blue-600 text-[10px] px-1.5 py-0.5 rounded text-white font-bold border-2 border-gray-900">
                 {item.count}

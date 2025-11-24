@@ -2,7 +2,7 @@ import React from 'react';
 import { Hammer, Backpack, Warehouse, Trash2, Coins } from 'lucide-react';
 import { ItemSlot } from '../ItemSlot';
 import { ItemIcon } from '../ItemIcon';
-import { EQUIPMENT_SLOTS, EQUIPMENT_TYPES, getSlotLabel } from '../../utils/gameUtils';
+import { EQUIPMENT_SLOTS, EQUIPMENT_TYPES, getSlotLabel, canUseEnhancementStone } from '../../utils/gameUtils';
 
 export const EquipmentView = ({
   equipment,
@@ -141,14 +141,19 @@ export const EquipmentView = ({
             {EQUIPMENT_SLOTS.map(slot => {
               const item = equipment[slot];
               if (!item) return null;
+              const canUse = equipmentItemMode?.type === 'enhancement_stone' 
+                ? canUseEnhancementStone(equipmentItemMode, item)
+                : true;
               return (
-                <div key={slot} className="flex flex-col items-center gap-2">
+                <div key={slot} className={`flex flex-col items-center gap-2 ${!canUse ? 'opacity-50' : ''}`}>
                   <div className="w-16 h-16">
                     <ItemSlot 
                       item={item} 
                       onClick={() => {
-                        useItemOnEquipment(equipmentItemMode, item);
-                        setEquipmentItemMode(null);
+                        if (canUse) {
+                          useItemOnEquipment(equipmentItemMode, item);
+                          setEquipmentItemMode(null);
+                        }
                       }}
                       iconSize={32}
                       optionDisplayMode={optionDisplayMode}
@@ -156,6 +161,9 @@ export const EquipmentView = ({
                     />
                   </div>
                   <span className="text-xs text-gray-400 text-center">{getSlotLabel(slot)}</span>
+                  {!canUse && equipmentItemMode?.type === 'enhancement_stone' && (
+                    <span className="text-xs text-red-400 text-center">使用不可</span>
+                  )}
                 </div>
               );
             })}
@@ -166,19 +174,27 @@ export const EquipmentView = ({
                 <Backpack size={16} /> インベントリの装備品
               </h4>
               <div className="grid grid-cols-6 md:grid-cols-8 gap-3 max-h-48 overflow-y-auto p-2 bg-gray-900/50 rounded-lg">
-                {inventory.filter(i => EQUIPMENT_TYPES.includes(i.type)).map(item => (
-                  <ItemSlot 
-                    key={item.id} 
-                    item={item} 
-                    onClick={() => {
-                      useItemOnEquipment(equipmentItemMode, item);
-                      setEquipmentItemMode(null);
-                    }}
-                    isSelected={selectedItem?.id === item.id}
-                    optionDisplayMode={optionDisplayMode}
-                    equipmentType={item?.type}
-                  />
-                ))}
+                {inventory.filter(i => EQUIPMENT_TYPES.includes(i.type)).map(item => {
+                  const canUse = equipmentItemMode?.type === 'enhancement_stone' 
+                    ? canUseEnhancementStone(equipmentItemMode, item)
+                    : true;
+                  return (
+                    <div key={item.id} className={!canUse ? 'opacity-50' : ''}>
+                      <ItemSlot 
+                        item={item} 
+                        onClick={() => {
+                          if (canUse) {
+                            useItemOnEquipment(equipmentItemMode, item);
+                            setEquipmentItemMode(null);
+                          }
+                        }}
+                        isSelected={selectedItem?.id === item.id}
+                        optionDisplayMode={optionDisplayMode}
+                        equipmentType={item?.type}
+                      />
+                    </div>
+                  );
+                })}
                 {inventory.filter(i => EQUIPMENT_TYPES.includes(i.type)).length === 0 && (
                   <div className="col-span-full text-center text-gray-500 py-4 text-sm">
                     なし
@@ -191,18 +207,26 @@ export const EquipmentView = ({
                 <Warehouse size={16} /> 倉庫の装備品
               </h4>
               <div className="grid grid-cols-6 md:grid-cols-8 gap-3 max-h-48 overflow-y-auto p-2 bg-gray-900/50 rounded-lg">
-                {warehouse.filter(i => EQUIPMENT_TYPES.includes(i.type)).map(item => (
-                  <ItemSlot 
-                    key={item.id} 
-                    item={item} 
-                    onClick={() => {
-                      useItemOnEquipment(equipmentItemMode, item, true);
-                      setEquipmentItemMode(null);
-                    }}
-                    optionDisplayMode={optionDisplayMode}
-                    equipmentType={item?.type}
-                  />
-                ))}
+                {warehouse.filter(i => EQUIPMENT_TYPES.includes(i.type)).map(item => {
+                  const canUse = equipmentItemMode?.type === 'enhancement_stone' 
+                    ? canUseEnhancementStone(equipmentItemMode, item)
+                    : true;
+                  return (
+                    <div key={item.id} className={!canUse ? 'opacity-50' : ''}>
+                      <ItemSlot 
+                        item={item} 
+                        onClick={() => {
+                          if (canUse) {
+                            useItemOnEquipment(equipmentItemMode, item, true);
+                            setEquipmentItemMode(null);
+                          }
+                        }}
+                        optionDisplayMode={optionDisplayMode}
+                        equipmentType={item?.type}
+                      />
+                    </div>
+                  );
+                })}
                 {warehouse.filter(i => EQUIPMENT_TYPES.includes(i.type)).length === 0 && (
                   <div className="col-span-full text-center text-gray-500 py-4 text-sm">
                     なし

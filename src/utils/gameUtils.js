@@ -21,6 +21,25 @@ export const getSlotType = (slot) => {
 export const EQUIPMENT_SLOTS = ['weapon', 'armor', 'amulet', 'ring1', 'ring2', 'belt', 'feet'];
 export const EQUIPMENT_TYPES = ['weapon', 'armor', 'amulet', 'ring', 'belt', 'feet'];
 
+// レアリティの順序
+export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+// 強化石が装備品に使用可能かチェック
+// 強化石のレアリティ以下の装備に使用可能
+export const canUseEnhancementStone = (stone, equipment) => {
+  if (!stone || !equipment || stone.type !== 'enhancement_stone') return false;
+  if (!equipment.rarity || !stone.rarity) return false;
+  
+  const stoneRarityIndex = RARITY_ORDER.indexOf(stone.rarity);
+  const equipmentRarityIndex = RARITY_ORDER.indexOf(equipment.rarity);
+  
+  // インデックスが見つからない場合はfalse
+  if (stoneRarityIndex === -1 || equipmentRarityIndex === -1) return false;
+  
+  // 強化石のレアリティ以下の装備に使用可能
+  return equipmentRarityIndex <= stoneRarityIndex;
+};
+
 // 装備品用アイテムがスタック可能かチェック
 export const canStackEquipmentItem = (item1, item2) => {
   if (!item1 || !item2) return false;
